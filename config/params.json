@@ -1,0 +1,16 @@
+{
+  "train_test_split" : 0.85,
+  "features" : ["Close", "Volume"],
+  "feature_prediction" : "Close",
+  "length_sequence" : 50,
+  "layers" : {
+              "neurons" : [100, 100, 100,1],
+              "activationDense" : "linear",
+              "timesteps" : 49,
+              "droprate" : [0.2, 0.2],
+              "loss" : "mse",
+              "optimizer" : "adam"
+              },
+  "num_epochs" : 2,
+  "batch_size" : 32
+}
