@@ -1,9 +1,20 @@
 from NYTApi import NYTApi
 from pathlib import Path
+import json
+import time
 
+
+QUERY = 'apple'
+BEGIN_DATE = '20120101'
+END_DATE = '20120101'
 
 FILE_PATH = Path(__file__).resolve().parents[0]
 TOKEN_PATH = (FILE_PATH / '../../config/token').resolve()
+DATA_PATH = (FILE_PATH / '../../data').resolve()
+
+
+def gen_identifier():
+    return str(int(time.time() / 1000))
 
 
 def main():
@@ -18,10 +29,13 @@ def main():
         return
 
     api = NYTApi(token)
-    result = api.search('apple', begin_date='20120101', end_date='20120101')
+    results = api.search(QUERY, BEGIN_DATE, END_DATE)
 
-    for article in result['response']['docs']:
-        print(article['abstract'])
+    print('Saving json...')
+    DATA_PATH.mkdir(parents=True, exist_ok=True)
+    file_path = DATA_PATH / (QUERY + '_' + BEGIN_DATE + '_' + END_DATE + '_' + gen_identifier() + '.json')
+    with file_path.open('w') as f:
+        json.dump(results, f)
 
 
 if __name__ == '__main__':
