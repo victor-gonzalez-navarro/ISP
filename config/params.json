@@ -12,5 +12,6 @@
               "optimizer" : "adam"
               },
   "num_epochs" : 2,
-  "batch_size" : 32
+  "batch_size" : 32,
+  "next_k_items" : 50
 }

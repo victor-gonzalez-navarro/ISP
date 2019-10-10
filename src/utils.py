@@ -50,3 +50,10 @@ def create_gen(seqs_train, batch_size):
         yield np.array(trn_x), np.array(trn_y)
 
         i += 1
+
+
+def color_gen():
+    colors = list('rgmykc')
+    while True:
+        for c in colors:
+            yield c
