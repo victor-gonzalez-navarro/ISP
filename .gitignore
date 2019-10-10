@@ -4,6 +4,9 @@
 # Token
 token
 
+# API
+nyt_api_limits.json
+
 # MAC
 .DS_Store
 
