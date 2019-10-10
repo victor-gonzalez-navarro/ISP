@@ -6,9 +6,12 @@ from keras.callbacks import ModelCheckpoint
 
 class Model:
 
-    def __init__(self, name, config):
-        self.name = name
-        self.model = Sequential()
+    def __init__(self, name, config, model=None):
+        if model is None:
+            self.name = name
+            self.model = Sequential()
+        else:
+            self.model = model
         self.config = config
 
     def buildLayers(self):
@@ -36,3 +39,5 @@ class Model:
         self.model.fit_generator(generator=generator, steps_per_epoch=int(n_seqs/self.config['batch_size']),
                                  epochs=self.config['num_epochs'], callbacks=callbacks, workers=1)
 
+    def predict(self):
+        self.model.predict()
