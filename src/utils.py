@@ -24,7 +24,7 @@ def preprocess(data, config):
 def create_dataset(matrix, config):
     dat_x = []
     dat_y = []
-    for i in range(matrix.shape[0]-config['length_sequence']+1):
+    for i in range(matrix.shape[0]-config['length_sequence']):  # +1):
         aux_matrix = matrix[i:i+config['length_sequence'], :]
         aux_matrix = aux_matrix / aux_matrix[0, :] - 1
 
@@ -49,7 +49,7 @@ def create_gen(seqs_train, batch_size):
 
         yield np.array(trn_x), np.array(trn_y)
 
-        i += 1
+        i += batch_size
 
 
 def color_gen():

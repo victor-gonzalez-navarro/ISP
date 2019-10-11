@@ -37,7 +37,8 @@ class Model:
             ModelCheckpoint(filepath='../models/'+self.name, monitor='loss', save_best_only=True)
         ]
 
-        self.model.fit_generator(generator=generator, steps_per_epoch=int(n_seqs/self.config['batch_size']),
+        steps_per_epoch = np.ceil(n_seqs/self.config['batch_size'])
+        self.model.fit_generator(generator=generator, steps_per_epoch=steps_per_epoch,
                                  epochs=self.config['num_epochs'], callbacks=callbacks, workers=1)
 
     def predict(self, tst_data, next_k_items=50, plot=None):
