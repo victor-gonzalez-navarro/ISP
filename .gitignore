@@ -1,11 +1,18 @@
 # PyCharm
 .idea/
 
+# Big DB
+GoogleNews-vectors-negative300.bin
+data/*.json
+
 # Token
-token
+token*
 
 # API
 nyt_api_limits.json
+
+# Pickles
+*.pickle
 
 # MAC
 .DS_Store

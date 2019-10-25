@@ -72,7 +72,9 @@ class NYTApi:
             url += '&end_date=' + end_date
 
         url += '&api-key=' + self.__token
-        return self.__get_all_json(url)
+        data = self.__get_all_json(url)
+        self.__save_limits()
+        return data
 
     def __get_all_json(self, url):
         hits = float('+inf')
@@ -80,11 +82,17 @@ class NYTApi:
         results = []
 
         while page * NYTApi.ITEMS_PER_PAGE < hits:
-            data = self.__get_json(url + '&page=%d' % page)
-            hits = data['response']['meta']['hits']
-            results += data['response']['docs']
+            try:
+                data = self.__get_json(url + '&page=%d' % page)
+                hits = data['response']['meta']['hits']
+                results += data['response']['docs']
+            except Exception as e:
+                pass
+            pages = int(math.ceil(hits / NYTApi.ITEMS_PER_PAGE))
+            eta = (pages - page) * 60 / self.__limits['limit_min']
             page += 1
-            print('Page %d of %d' % (page,  int(math.ceil(hits / NYTApi.ITEMS_PER_PAGE))))
+            print('\rPage %d of %d (ETA %ds)' % (page, pages, eta), end='')
+        print()
 
         return results
 
