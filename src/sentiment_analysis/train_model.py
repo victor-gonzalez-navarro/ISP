@@ -2,25 +2,24 @@ import os; os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import json
 from datetime import datetime
 from pathlib import Path
-from gensim.models import KeyedVectors
 
 import matplotlib.pyplot as plt
 import nltk
 import numpy as np
 import pandas as pd
-from utils import smooth, cache
+from utils import smooth
 from keras.preprocessing import sequence
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from sklearn.model_selection import train_test_split
 from tensorflow.python.client import device_lib
 
-from sentiment_analysis.NewsModel import NewsModel, NewsModelEmbedding
-from sentiment_analysis.BOWModel import BOWModel
+from sentiment_analysis.NNModel import NNModel
+from sentiment_analysis.w2v_models import GensimModel
 
 QUERY = 'Apple'
 FILE_PATH = Path(__file__).resolve().parents[0]
-MODEL_PATH = (FILE_PATH / '../../models/news_model_google.h5')
+MODEL_PATH = (FILE_PATH / '../../models/news_model.h5')
 GOOGLE_W2VEC_DB = (FILE_PATH / '../../data/GoogleNews-vectors-negative300.bin').resolve()
 STOCK_PATH = (FILE_PATH / '../../data/sp500.csv').resolve()
 NEWS_PATH = (FILE_PATH / '../../data/apple_20070101_20071231_1571064.json').resolve()
@@ -28,6 +27,8 @@ BEGIN_TIME = datetime(year=2007, month=1, day=1)
 END_TIME = datetime(year=2008, month=1, day=4)
 SMOOTH_SIZE = 3
 MAX_INPUT_LEN = 150
+PREV_WINDOW = 10
+NEXT_WINDOW = 10
 
 
 def read_stocks(path: Path, start, end, normalize=True):
@@ -69,20 +70,17 @@ def convert_news2vec(news, model, stop_words, max_size=73):
         words = txt.replace("\n", " ")
         words = [word.lower() for word in word_tokenize(words) if word.isalpha()]
         words = [word for word in words if word not in stop_words]
-        if isinstance(model, BOWModel):
-            article['word2vec'] = [model[word] for word in words]
-        else:
-            article['word2vec'] = [model[word] for word in words if word in model.vocab]
+        article['word2vec'] = model.words2index(words)
         if len(article['word2vec']) > max_size:
             print('Article too long !:',  article['txt'])
             article['word2vec'] = article['word2vec'][:max_size]
 
 
-def add_binary_label(x, y, news, time_window=0):
+def add_binary_label(x, y, news):
     for article in news:
         idx = next(i for i, v in enumerate(x) if v >= article['date'])
-        start = max(0, idx - 10)
-        end = min(len(y) - 1, idx + 10)
+        start = max(0, idx - PREV_WINDOW)
+        end = min(len(y) - 1, idx + NEXT_WINDOW)
         diff = y[end] - y[start]
         article['outcome'] = 1 if diff >= 0 else 0
 
@@ -122,8 +120,7 @@ def main():
 
     # --- Preprocess ---
     stop_words = set(stopwords.words('english'))
-    word2vec_model = BOWModel()
-    # word2vec_model = cache(lambda: KeyedVectors.load_word2vec_format(GOOGLE_W2VEC_DB, binary=True), path=Path('./word2vec_model.pickle'))
+    word2vec_model = GensimModel('glove-twitter-100')  # BOWModel()
 
     x, y = read_stocks(STOCK_PATH, start=BEGIN_TIME, end=END_TIME)
     smooth_y = smooth(y, half_window=SMOOTH_SIZE)
@@ -134,8 +131,7 @@ def main():
     # --- Train ---
     x_train, y_train, x_test, y_test = gen_training(news, test_size=0.2, max_input_len=MAX_INPUT_LEN)
 
-    model = NewsModelEmbedding(len(word2vec_model), 32, MAX_INPUT_LEN)
-    # model = NewsModel()
+    model = NNModel(word2vec_model.generate_embedding_layer(MAX_INPUT_LEN))
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
     model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=10, batch_size=64)
     model.save_weights(MODEL_PATH)
