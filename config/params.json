@@ -4,7 +4,7 @@
   "feature_prediction" : "Close",
   "length_sequence" : 50,
   "layers" : {
-              "neurons" : [100, 100, 100,1],
+              "neurons" : [100, 100, 100, 1],
               "activationDense" : "linear",
               "timesteps" : 49,
               "droprate" : [0.2, 0.2],
