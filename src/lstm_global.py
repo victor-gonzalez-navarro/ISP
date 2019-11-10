@@ -18,19 +18,23 @@ class LSTM_Global:
         self.config = config
 
     def buildLayers(self):
-        self.model.add(LSTM(self.config['layers_lstm_global']['neurons'][0],
-                            input_shape=(self.config['layers_lstm_global']['timesteps'], 2),
-                            return_sequences=True))
-        self.model.add(Dropout(self.config["layers_lstm_global"]["droprate"][0]))
-        self.model.add(LSTM(self.config['layers_lstm_global']['neurons'][1],
-                            input_shape=(None, None), #(self.config['layers_lstm_global']['timesteps'], None),
-                            return_sequences=True))
-        self.model.add(LSTM(self.config['layers_lstm_global']['neurons'][2],
-                            input_shape=(None, None), #(self.config['layers_lstm_global']['timesteps'], None),
-                            return_sequences=False))
-        self.model.add(Dropout(self.config["layers_lstm_global"]["droprate"][1]))
+        #self.model.add(LSTM(self.config['layers_lstm_global']['neurons'][0],
+        #                    input_shape=(self.config['layers_lstm_global']['timesteps'], 2),
+        #                    return_sequences=True))
+        #self.model.add(Dropout(self.config["layers_lstm_global"]["droprate"][0]))
+        #self.model.add(LSTM(self.config['layers_lstm_global']['neurons'][1],
+        #                    input_shape=(None, None), #(self.config['layers_lstm_global']['timesteps'], None),
+        #                    return_sequences=True))
+        #self.model.add(LSTM(self.config['layers_lstm_global']['neurons'][2],
+        #                    input_shape=(None, None), #(self.config['layers_lstm_global']['timesteps'], None),
+        #                    return_sequences=False))
+        #self.model.add(Dropout(self.config["layers_lstm_global"]["droprate"][1]))
+        #self.model.add(Dense(self.config['layers_lstm_global']['timesteps'],
+        #                     activation=self.config['layers_lstm_global']['activationDense']))
+
         self.model.add(Dense(self.config['layers_lstm_global']['timesteps'],
-                             activation=self.config['layers_lstm_global']['activationDense']))
+                             input_shape=(1, self.config['layers_lstm_global']['timesteps'] * 2),
+                             return_sequences=True))
 
         self.model.compile(loss=self.config['layers_lstm_global']['loss'],
                            optimizer=self.config['layers_lstm_global']['optimizer'])
@@ -43,6 +47,9 @@ class LSTM_Global:
         steps_per_epoch = np.ceil(n_seqs/self.config['batch_size'])
         self.model.fit_generator(generator=generator, steps_per_epoch=steps_per_epoch,
                                  epochs=self.config['num_epochs'], callbacks=callbacks, workers=1)
+
+    def fit_reg(self, trn_seqs):
+        pass
 
     def predict(self, tst_data, plot=None):
         y_pred = np.zeros((len(tst_data), len(tst_data[0][1])))

@@ -22,10 +22,10 @@ class Model2:
                             return_sequences=True))
         self.model.add(Dropout(self.config["layers"]["droprate"][0]))
         self.model.add(LSTM(self.config['layers']['neurons'][1],
-                            input_shape=(None, None), #(self.config['layers']['timesteps'], None),
+                            input_shape=(self.config['layers']['timesteps'], None),
                             return_sequences=True))
         self.model.add(LSTM(self.config['layers']['neurons'][2],
-                            input_shape=(None, None), #(self.config['layers']['timesteps'], None),
+                            input_shape=(self.config['layers']['timesteps'], None),
                             return_sequences=False))
         self.model.add(Dropout(self.config["layers"]["droprate"][1]))
         self.model.add(Dense(output_feats, activation=self.config['layers']['activationDense']))
@@ -68,5 +68,26 @@ class Model2:
                     start = end - next_k_items
                     plot.plot(list(range(start, end)), y_pred[:, self.config['features'].index('Close')], next(color),
                               linewidth=2)
+
+        return y_preds
+
+
+    def predict_all(self, tst_data, next_k_items=50, plot=None):
+        y_preds = []
+        y_pred = np.zeros((next_k_items, tst_data[0][0].shape[1]))
+
+        for seq_id in range(len(tst_data)):
+            for counter in range(next_k_items):
+                if counter % next_k_items == 0:
+                    counter = 0
+                    sequence = np.copy(tst_data[seq_id][0])
+
+                else:
+                    sequence = np.concatenate((tst_data[seq_id][0][:-counter, :], y_pred[:counter, :]),
+                                              axis=0)
+
+                y_pred[counter] = self.model.predict(np.array([sequence]))[0, :]
+
+            y_preds.append(np.copy(y_pred[:, self.config['features'].index('Close')]))
 
         return y_preds

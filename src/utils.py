@@ -118,6 +118,14 @@ def create_dataset_lstm_global(lstm_out, arima_out, gt):
     return list(zip(dat_x, dat_y))
 
 
+def create_dataset_lstm_global2(lstm_out, arima_out):
+    dat_x = []
+    for i in range(len(lstm_out)):
+        dat_x.append(np.array([lstm_out[i][0], arima_out[i][0][0]]))
+
+    return np.array(dat_x)
+
+
 def create_gen(seqs_train, batch_size):
     i = 0
 
@@ -171,5 +179,29 @@ def predict_arima(tst_data, config, next_k_items=50, plot=None):
                 end = seq_id + config['length_sequence'] - next_k_items
                 start = end - next_k_items
                 plot.plot(list(range(start, end)), y_pred_arima[:, 0], next(color) + '*-', markersize=2, linewidth=0.5)
+
+    return y_preds_arima
+
+
+def predict_arima_all(tst_data, config, next_k_items=50, plot=None):
+    y_preds_arima = []
+    y_pred_arima = np.zeros((next_k_items, 1))
+
+    for seq_id in tqdm(range(len(tst_data))):
+        for counter in range(next_k_items):
+            if counter % next_k_items == 0:
+                counter = 0
+                history = np.copy(tst_data[seq_id][0][:, config['features'].index('Close')])
+
+            else:
+                history = np.concatenate((tst_data[seq_id][0][:-counter, config['features'].index('Close')],
+                                          y_pred_arima[:counter].reshape([counter,])))
+
+            arima = ARIMA(history, order=tuple(config['ARIMA_params']))
+            arima_fit = arima.fit(disp=0)
+
+            y_pred_arima[counter] = arima_fit.forecast()[0]
+
+        y_preds_arima.append(np.copy(y_pred_arima))
 
     return y_preds_arima
