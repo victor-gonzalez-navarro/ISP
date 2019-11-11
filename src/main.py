@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from lstm_global import LSTM_Global
 from model2 import Model2
 from utils import preprocess, preprocess_all, preprocess_all_extra, color_gen, predict_arima, \
-    create_dataset_lstm_global, create_dataset_lstm_global2, predict_arima_all
+    create_dataset_lstm_global, create_dataset_lstm_global2, predict_arima_all, create_dataset_reg
 from utils import read_data
 from utils import create_gen
 from model import Model
@@ -199,13 +199,13 @@ def main_other():
     sp.plot(list(range(len(seqs_test))), [y[0] for x, y in seqs_test], linewidth=2)
 
     trn_samples = round(config['train_test_split'] * data.shape[0])
-    seqs_train2 = create_dataset_lstm_global2(lstm_preds_trn,
-                                             arima_preds_trn)
-                                             #data[config['features']].values[:(trn_samples + config['next_k_items']),
-                                             #     config['features'].index('Close')])
+    seqs_train2, y_train = create_dataset_reg(lstm_preds_trn[:-config['next_k_items']],
+                                              arima_preds_trn[:-config['next_k_items']],
+                                              [seq[1][config['features'].index('Close')] for seq in seqs_train])
+    # y_train = [seq[1][config['features'].index('Close')] for seq in seqs_train]
 
     model_rf = RandomForestRegressor(n_estimators=config['rf_estimators'], random_state=100)
-    model_rf.fit(seqs_train2, [seq[1][config['features'].index('Close')] for seq in seqs_train])
+    model_rf.fit(seqs_train2, y_train)
 
     #gen2 = create_gen(seqs_train2, config['batch_size'])
 
@@ -215,11 +215,11 @@ def main_other():
     #lstm_global.fit(gen2, len(seqs_train2))
 
     print('Starting ARIMA Predictions...')
-    arima_preds_tst = predict_arima(seqs_test, config, next_k_items=config['next_k_items'], plot=sp)
+    arima_preds_tst = predict_arima(seqs_test, config, next_k_items=config['next_k_items'])  #, plot=sp)
     print('ARIMA Predictions Finished!')
 
     print('Starting LSTM Predictions...')
-    lstm_preds_tst = m.predict(seqs_test, next_k_items=config['next_k_items'], plot=sp)
+    lstm_preds_tst = m.predict(seqs_test, next_k_items=config['next_k_items'])  #, plot=sp)
     print('LSTM Predictions Finished!')
 
     seqs_test2 = create_dataset_lstm_global(lstm_preds_tst,
@@ -238,8 +238,7 @@ def main_other():
         if plot:
             start = end
             end = start + len(reg_preds)
-            sp.plot(list(range(start, end)), reg_preds.T, next(color) + '^-', markersize=3,
-                    linewidth=0.5)
+            sp.plot(list(range(start, end)), reg_preds.T, next(color) + '*-', markersize=2, linewidth=0.5)
 
     plt.show()
 

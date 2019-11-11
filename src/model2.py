@@ -71,7 +71,6 @@ class Model2:
 
         return y_preds
 
-
     def predict_all(self, tst_data, next_k_items=50, plot=None):
         y_preds = []
         y_pred = np.zeros((next_k_items, tst_data[0][0].shape[1]))

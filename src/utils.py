@@ -126,6 +126,17 @@ def create_dataset_lstm_global2(lstm_out, arima_out):
     return np.array(dat_x)
 
 
+def create_dataset_reg(lstm_out, arima_out, gt):
+    dat_x = []
+    dat_y = []
+    for i in range(len(lstm_out)):
+        for j in range(len(lstm_out[i])):
+            dat_x.append(np.array([lstm_out[i][j], arima_out[i][j][0]]))
+            dat_y.append(gt[i+j])
+
+    return np.array(dat_x), dat_y
+
+
 def create_gen(seqs_train, batch_size):
     i = 0
 
