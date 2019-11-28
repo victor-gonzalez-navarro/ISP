@@ -9,9 +9,9 @@ class NNModel(keras.Model):
         if embedding_layer:
             self.__embedding = embedding_layer
         self.__lstm = LSTM(100)
-        self.__dense = Dense(1, activation='sigmoid')
+        self.__dense2 = Dense(1, activation='sigmoid')
 
     def call(self, inputs, mask=None):
         x = self.__embedding(inputs)
         x = self.__lstm(x)
-        return self.__dense(x)
+        return self.__dense2(x)

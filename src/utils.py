@@ -4,6 +4,27 @@ from pathlib import Path
 import pickle
 
 
+class Logger:
+
+    def __init__(self, quiet=False):
+        self.quiet = quiet
+
+    def i(self, msg):
+        if not self.quiet:
+            print(msg)
+
+    def d(self, msg):
+        if not self.quiet:
+            print(msg)
+
+    def e(self, msg):
+        if not self.quiet:
+            print(msg)
+
+
+logger = Logger()
+
+
 def smooth(y, half_window):
     smoothed = [0] * len(y)
     for i in range(len(y)):

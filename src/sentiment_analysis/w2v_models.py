@@ -67,8 +67,8 @@ class GensimModel(W2VModel):
     def word2index(self, word):
         return self.vocab.vocab[word].index
 
-    def generate_embedding_layer(self, in_len):
-        return self.vocab.get_keras_embedding(train_embeddings=False)
+    def generate_embedding_layer(self, in_len, trainable=False):
+        return self.vocab.get_keras_embedding(train_embeddings=trainable)
 
 
 class BOWModel(W2VModel):

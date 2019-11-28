@@ -87,8 +87,8 @@ class NYTApi:
                 hits = data['response']['meta']['hits']
                 results += data['response']['docs']
             except Exception as e:
-                pass
-            pages = int(math.ceil(hits / NYTApi.ITEMS_PER_PAGE))
+                print(e)
+            pages = int(math.ceil(hits / NYTApi.ITEMS_PER_PAGE)) if hits < 999999 else 0
             eta = (pages - page) * 60 / self.__limits['limit_min']
             page += 1
             print('\rPage %d of %d (ETA %ds)' % (page, pages, eta), end='')
@@ -107,9 +107,9 @@ class NYTApi:
         if wait > 0:
             time.sleep(wait)
 
+        self.__last_query = time.time()
         self.__limits['queries'] += 1
         with urllib.request.urlopen(url) as response:
             res = json.loads(response.read().decode())
 
-        self.__last_query = time.time()
         return res
