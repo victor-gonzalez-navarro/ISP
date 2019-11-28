@@ -1,0 +1,27 @@
+{
+  "train_test_split" : 0.85,
+  "features" : ["Close", "Volume", "High", "Low", "Open"],
+  "length_sequence" : 30,
+  "layers" : {
+              "neurons" : [100, 100, 100],
+              "activationDense" : "linear",
+              "timesteps" : 29,
+              "droprate" : [0.2, 0.2],
+              "loss" : "mse",
+              "optimizer" : "adam"
+              },
+   "layers_lstm_global" : {
+              "neurons" : [100, 100, 100],
+              "activationDense" : "linear",
+              "timesteps" : 30,
+              "droprate" : [0.2, 0.2],
+              "loss" : "mse",
+              "optimizer" : "adam"
+              },
+  "num_epochs" : 2,
+  "batch_size" : 32,
+  "next_k_items" : 30,
+  "fourier_coefs" : [1, 3, 10],
+  "ARIMA_params" : [1,1,0],
+  "rf_estimators" : 150
+}
