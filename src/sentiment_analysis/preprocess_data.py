@@ -119,8 +119,6 @@ def tokens_span(txt):
 
 
 def preprocess(news, encoding='UTF-8'):
-    headlines = [article['txt'] for article in news]
-
     items = 'photo|map|drawing|chart|diagram|recipe|list|graph|logo|illustration|' \
             '(other photos)|cartoon|(photo, drawing)|(diagram of balcony)|(photo \\(Pulse column\\))'
     
@@ -131,17 +129,18 @@ def preprocess(news, encoding='UTF-8'):
     regex_rwapple = re.compile(r'\bR\s?\.?(\s+)?W\s?\.?\s+Apple(\'s|[,.;])?\s+(jr\.?)?', re.IGNORECASE)
 
     # Remove headlines that may not refer to the company
-    headlines = [headline for headline in headlines if not re.findall(r'\b(applefarm|apples|fruits?|trees?|((golden|red|green)\s+apples?)|(apples?\s+pies?))\b', headline, re.IGNORECASE)]
+    news = [article for article in news if not re.findall(r'\b(applefarm|apples|fruits?|trees?|((golden|red|green)\s+apples?)|(apples?\s+pies?))\b', article['txt'], re.IGNORECASE)]
 
     # Remove specific lines
     TO_REMOVE = ['GORDON-Edward. To our beloved Dad and Papa', 'MUSCHEL-Chaim. Young Israel', '6449 Letzing', 'Big Apple Circus', 'Selborne Journal: Monday, 24 May 1784', 'A selective listing by critics of The Times: New or noteworthy Broadway and Off Broadway shows this weekend', 'EMBLEMS Animal', 'EMBLEMS Bird', 'RARELY can store-bought fruit match']
-    headlines = [headline for headline in headlines if not contains_any(headline, TO_REMOVE)]
+    news = [article for article in news if not contains_any(article['txt'], TO_REMOVE)]
 
     # Remove all headlines by R W Apple
-    headlines = [headline for headline in headlines if not regex_rwapple.search(headline)]
+    news = [article for article in news if not regex_rwapple.search(article['txt'])]
 
     # Basic pre-processing
-    for i, headline in enumerate(headlines):
+    for i, article in enumerate(news):
+        headline = article['txt']
         headline = headline.encode(encoding, errors='strict').decode(encoding)  # Assert no encoding errors
         headline = headline.replace('’', '\'')
         headline = headline.replace('‘', '\'')
@@ -152,10 +151,11 @@ def preprocess(news, encoding='UTF-8'):
         headline = regex_author.sub('Author', headline)
         headline = headline.replace('Q.', '')  # Remove Q. (Question) Indicator
         headline = headline.replace('Q\'s', '')  # Remove Q. (Question) Indicator
-        headlines[i] = headline.strip()  # Trim string
+        news[i]['txt'] = headline.strip()  # Trim string
 
     # Decontraction
-    for i, headline in enumerate(headlines):
+    for i, article in enumerate(news):
+        headline = article['txt']
         headline = re.sub(r"won\'t", "will not", headline)
         headline = re.sub(r"can\'t", "can not", headline)
         headline = re.sub(r"n\'t", " not", headline)
@@ -166,92 +166,94 @@ def preprocess(news, encoding='UTF-8'):
         headline = re.sub(r"\'t", " not", headline)
         headline = re.sub(r"\'ve", " have", headline)
         headline = re.sub(r"\'m", " am", headline)
-        headlines[i] = headline
+        news[i]['txt'] = headline
 
     # Check if any tags or size was not removed
-    for headline in headlines:
+    for article in news:
+        headline = article['txt']
         if re.search('; .{1,20} \(.\)', headline) or re.search('\(.\)$', headline):
             logger.e('Headline may not be processed correctly:', headline[-100:])
 
     # Check for names
     regex_name = re.compile(r'([A-Z][a-z]+)\s+[A-Z]\.?\s+([A-Z][a-z]+)')
     regex_osurname = re.compile(r'O\'([A-Z][a-z]+)')
-    for i, _ in enumerate(headlines):
-        headlines[i] = regex_osurname.sub('\\1', headlines[i])
-        headlines[i] = regex_name.sub('\\1 \\2', headlines[i])
-        headlines[i] = headlines[i].replace('Steven', 'Steve')  # Steve and Steven Jobs
+    for i, _ in enumerate(news):
+        news[i]['txt'] = regex_osurname.sub('\\1', news[i]['txt'])
+        news[i]['txt'] = regex_name.sub('\\1 \\2', news[i]['txt'])
+        news[i]['txt'] = news[i]['txt'].replace('Steven', 'Steve')  # Steve and Steven Jobs
 
     # iPhone names
     regex_iphone = re.compile(r'i[Pp]hone\s+(\d\d|\dG?S?c?s?|SE|XR?S?)(\s+S)?(\s+(Plus|Max|Pro))?(\s+(Plus|Max|Pro))?')
-    for i, headline in enumerate(headlines):
-        headlines[i] = regex_iphone.sub('iphone', headline) # iPhone names
+    for i, article in enumerate(news):
+        news[i]['txt'] = regex_iphone.sub('iphone', article['txt'])  # iPhone names
 
     # Remove some specific contraptions from some companies
-    for i, _ in enumerate(headlines):
-        if headlines[i].endswith('. S'):
-            headlines[i] = headlines[i].replace('. S', '')
-        headlines[i] = headlines[i].replace('À', 'A')
-        headlines[i] = headlines[i].replace('A. A. C.', 'AAC')
-        headlines[i] = headlines[i].replace('Toys \'R\' Us', 'ToysRUs')
-        headlines[i] = headlines[i].replace('&#038;', '&')
-        headlines[i] = headlines[i].replace('AT&T', 'ATT')
-        headlines[i] = headlines[i].replace('S.&P.', 'SP')
-        headlines[i] = headlines[i].replace('S&P.', 'SP')
-        headlines[i] = headlines[i].replace('S&P', 'SP')
-        headlines[i] = headlines[i].replace('R&B', 'RB')
-        headlines[i] = headlines[i].replace('I&S', 'IS')
-        headlines[i] = headlines[i].replace('J.P. Morgan', 'JP Morgan')
-        headlines[i] = headlines[i].replace('J. P. Morgan', 'JP Morgan')
-        headlines[i] = headlines[i].replace('J. P Morgan', 'JP Morgan')
-        headlines[i] = headlines[i].replace('F.B.I.', 'FBI')
-        headlines[i] = headlines[i].replace('hip-hop', 'hiphop')
-        headlines[i] = headlines[i].replace('M&A', 'MA')
-        headlines[i] = headlines[i].replace('M&M', 'MM')
-        headlines[i] = headlines[i].replace('OS X', 'OSX')
-        headlines[i] = headlines[i].replace('Verizon is V Cast service', 'Verizon')
-        headlines[i] = headlines[i].replace('Galaxy S II', 'GalaxyS')
-        headlines[i] = headlines[i].replace('Galaxy S III', 'GalaxyS')
-        headlines[i] = headlines[i].replace('S II', 'GalaxyS')
-        headlines[i] = headlines[i].replace('S III', 'GalaxyS')
-        headlines[i] = headlines[i].replace('Nexus Q', 'NexusQ')
-        headlines[i] = headlines[i].replace('J.& J.', 'JJ')
-        headlines[i] = headlines[i].replace('Mac OX X', 'Mac')
-        headlines[i] = headlines[i].replace('iTunes U', 'iTunes')
-        headlines[i] = headlines[i].replace('Zen Vision:M', 'Zen Vision')
-        headlines[i] = headlines[i].replace('Vision:M', 'Vision')
-        headlines[i] = headlines[i].replace('Apple I', 'Apple Computer')
-        headlines[i] = headlines[i].replace('Final Cut Pro X', 'VideoEditor')
-        headlines[i] = headlines[i].replace('The Elder Scrolls V: Skyrim', 'Game')
+    for i, _ in enumerate(news):
+        if news[i]['txt'].endswith('. S'):
+            news[i]['txt'] = news[i]['txt'].replace('. S', '')
+        news[i]['txt'] = news[i]['txt'].replace('À', 'A')
+        news[i]['txt'] = news[i]['txt'].replace('A. A. C.', 'AAC')
+        news[i]['txt'] = news[i]['txt'].replace('Toys \'R\' Us', 'ToysRUs')
+        news[i]['txt'] = news[i]['txt'].replace('&#038;', '&')
+        news[i]['txt'] = news[i]['txt'].replace('AT&T', 'ATT')
+        news[i]['txt'] = news[i]['txt'].replace('S.&P.', 'SP')
+        news[i]['txt'] = news[i]['txt'].replace('S&P.', 'SP')
+        news[i]['txt'] = news[i]['txt'].replace('S&P', 'SP')
+        news[i]['txt'] = news[i]['txt'].replace('R&B', 'RB')
+        news[i]['txt'] = news[i]['txt'].replace('I&S', 'IS')
+        news[i]['txt'] = news[i]['txt'].replace('J.P. Morgan', 'JP Morgan')
+        news[i]['txt'] = news[i]['txt'].replace('J. P. Morgan', 'JP Morgan')
+        news[i]['txt'] = news[i]['txt'].replace('J. P Morgan', 'JP Morgan')
+        news[i]['txt'] = news[i]['txt'].replace('F.B.I.', 'FBI')
+        news[i]['txt'] = news[i]['txt'].replace('hip-hop', 'hiphop')
+        news[i]['txt'] = news[i]['txt'].replace('M&A', 'MA')
+        news[i]['txt'] = news[i]['txt'].replace('M&M', 'MM')
+        news[i]['txt'] = news[i]['txt'].replace('OS X', 'OSX')
+        news[i]['txt'] = news[i]['txt'].replace('Verizon is V Cast service', 'Verizon')
+        news[i]['txt'] = news[i]['txt'].replace('Galaxy S II', 'GalaxyS')
+        news[i]['txt'] = news[i]['txt'].replace('Galaxy S III', 'GalaxyS')
+        news[i]['txt'] = news[i]['txt'].replace('S II', 'GalaxyS')
+        news[i]['txt'] = news[i]['txt'].replace('S III', 'GalaxyS')
+        news[i]['txt'] = news[i]['txt'].replace('Nexus Q', 'NexusQ')
+        news[i]['txt'] = news[i]['txt'].replace('J.& J.', 'JJ')
+        news[i]['txt'] = news[i]['txt'].replace('Mac OX X', 'Mac')
+        news[i]['txt'] = news[i]['txt'].replace('iTunes U', 'iTunes')
+        news[i]['txt'] = news[i]['txt'].replace('Zen Vision:M', 'Zen Vision')
+        news[i]['txt'] = news[i]['txt'].replace('Vision:M', 'Vision')
+        news[i]['txt'] = news[i]['txt'].replace('Apple I', 'Apple Computer')
+        news[i]['txt'] = news[i]['txt'].replace('Final Cut Pro X', 'VideoEditor')
+        news[i]['txt'] = news[i]['txt'].replace('The Elder Scrolls V: Skyrim', 'Game')
 
-        headlines[i] = headlines[i].replace('C.E.O.', 'CEO')
-        headlines[i] = headlines[i].replace('iMac', 'Mac')
-        headlines[i] = headlines[i].replace('Apple ComputerIE', 'Apple')
-        headlines[i] = headlines[i].replace('Apple-1', 'Apple')
-        headlines[i] = headlines[i].replace('Apple Computernc', 'Apple')
-        headlines[i] = headlines[i].replace('Apple Computer', 'Apple')
-        headlines[i] = headlines[i].replace('Apple Co', 'Apple')
-        headlines[i] = headlines[i].replace('Apple Co.', 'Apple')
-        headlines[i] = headlines[i].replace('Apple Company', 'Apple')
-        headlines[i] = headlines[i].replace('Apple Corps Ltd.', 'Apple')
-        headlines[i] = headlines[i].replace('Apple Corps', 'Apple')
-        headlines[i] = headlines[i].replace('Apple Inc', 'Apple')
-        headlines[i] = headlines[i].replace('Apple Inc.', 'Apple')
-        headlines[i] = headlines[i].replace('Apple computers', 'Apple')
-        headlines[i] = headlines[i].replace('Apple computer', 'Apple')
-        headlines[i] = headlines[i].replace('Apple computers.', 'Apple')
-        headlines[i] = headlines[i].replace('Apple computer.', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('C.E.O.', 'CEO')
+        news[i]['txt'] = news[i]['txt'].replace('iMac', 'Mac')
+        news[i]['txt'] = news[i]['txt'].replace('Apple ComputerIE', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('Apple-1', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('Apple Computernc', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('Apple Computer', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('Apple Co', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('Apple Co.', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('Apple Company', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('Apple Corps Ltd.', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('Apple Corps', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('Apple Inc', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('Apple Inc.', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('Apple computers', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('Apple computer', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('Apple computers.', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('Apple computer.', 'Apple')
 
     # Remove single words in mayus
-    for k, headline in enumerate(headlines):
+    for k, article in enumerate(news):
+        headline = article['txt']
         tokens, spans = tokens_span(headline)
 
         offset = 0
         for i, token in enumerate(tokens):
             if len(token) == 1 and token.isupper() and token.isalnum() and not is_subject_uppercase_i(tokens, i) and not is_preposition_uppercase_a(tokens, i):
-                headlines[k] = headlines[k][:spans[i][0] + offset] + headlines[k][spans[i][1] + offset:]
+                news[k]['txt'] = news[k]['txt'][:spans[i][0] + offset] + news[k]['txt'][spans[i][1] + offset:]
                 offset -= 1
 
-        headlines[k] = regex_spaces.sub(' ', headlines[k])  # Remove multiple spaces
+        news[k]['txt'] = regex_spaces.sub(' ', news[k]['txt'])  # Remove multiple spaces
 
     # Check for words that are all in mayus
     #unknown = set()
@@ -290,7 +292,7 @@ def preprocess(news, encoding='UTF-8'):
         exit()
 
     # Remove non words
-    return headlines
+    return news
 
 
 def main():
@@ -311,7 +313,7 @@ def main():
     print('Before', before, 'After', after, 'Removed', before - after)
 
     with OUT_PATH.open('w') as f:
-        json.dump(news, f)
+        json.dump(news, f, indent=4, sort_keys=True, default=str)
 
 
 if __name__ == '__main__':
