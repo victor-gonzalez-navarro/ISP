@@ -1,6 +1,9 @@
 # PyCharm
 .idea/
 
+# Big models
+news_models.h5
+
 # Big DB
 GoogleNews-vectors-negative300.bin
 data/*.json
