@@ -3,6 +3,59 @@ import numpy as np
 from statsmodels.tsa.arima_model import ARIMA
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from pathlib import Path
+import pickle
+
+
+class Logger:
+
+    def __init__(self, quiet=False):
+        self.quiet = quiet
+
+    def i(self, msg):
+        if not self.quiet:
+            print(msg)
+
+    def d(self, msg):
+        if not self.quiet:
+            print(msg)
+
+    def e(self, msg):
+        if not self.quiet:
+            print(msg)
+
+
+logger = Logger()
+
+
+def smooth(y, half_window):
+    smoothed = [0] * len(y)
+    for i in range(len(y)):
+        start = max(0, i - half_window)
+        end = min(len(y) - 1, i + half_window)
+        smoothed[i] = np.mean(y[start:end])
+    return smoothed
+
+
+def cache(func, args=(), force=False, path=Path('./tmp.pickle')):
+    """ Cache function result """
+    path = Path(path)
+
+    if path.exists() and path.is_file() and not force:
+        try:
+            result = pickle.load(path.open('rb'))
+        except IOError:
+            print('Could not load pickle %s' % path)
+            result = None
+
+    else:
+        result = func(*args)
+        try:
+            pickle.dump(result, path.open('wb'))
+        except IOError:
+            print('Could not save pickle %s' % path)
+
+    return result
 
 
 def read_data(path):

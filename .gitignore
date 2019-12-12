@@ -1,8 +1,20 @@
 # PyCharm
 .idea/
 
+# Big models
+models/news_model.h5
+
+# Big DB
+GoogleNews-vectors-negative300.bin
+
 # Token
-token
+token*
+
+# API
+nyt_api_limits.json
+
+# Pickles
+*.pickle
 
 # MAC
 .DS_Store
