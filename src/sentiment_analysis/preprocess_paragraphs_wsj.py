@@ -10,8 +10,8 @@ from tensorflow.python.client import device_lib
 from src.sentiment_analysis.ground_truth import read_news
 
 FILE_PATH = Path(__file__).resolve().parents[0]
-IN_PATH = (FILE_PATH / '../../data/preprocessed20.json').resolve()
-OUT_PATH = (FILE_PATH / '../../data/preprocessed_content.json').resolve()
+IN_PATH = (FILE_PATH / '../../data/preprocessed_wsj6.json').resolve()
+OUT_PATH = (FILE_PATH / '../../data/preprocessed_wsj6_.json').resolve()
 STOP_WORDS_PATH = (FILE_PATH / '../../data/stop_words.txt').resolve()
 MAX_LEN = 5000
 
@@ -134,9 +134,7 @@ def main():
     news = read_news(IN_PATH)
 
     for i, article in enumerate(tqdm(news)):
-        content = get_content(article)
-        content = re.sub(r'\A([A-Z]+\s+)+|(\s+[A-Z\.]+)+\Z', '', content)
-        article['content'] = content
+        content = article['content']
         article['word_vector'] = vectorize(content, stop_words)
         article['word_indexes_big'] = indexes(article['word_vector'], word2vec_model)
 

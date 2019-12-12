@@ -2,7 +2,8 @@
 .idea/
 
 # Big models
-models/news_model.h5
+models/news_model*.h5
+data/preprocessed_content.json
 
 # Big DB
 GoogleNews-vectors-negative300.bin

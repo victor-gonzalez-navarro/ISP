@@ -10,7 +10,7 @@ from utils import smooth
 from keras.preprocessing import sequence
 from sklearn.model_selection import train_test_split
 from tensorflow.python.client import device_lib
-from src.sentiment_analysis.ground_truth import read_news, read_stocks, prune_news, add_labels_classification, add_labels
+from src.sentiment_analysis.ground_truth import read_news, read_stocks, prune_news, add_labels_classification, add_labels, plot_ground_truth_per_article
 
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import confusion_matrix
@@ -23,7 +23,7 @@ from pandas.plotting import register_matplotlib_converters
 
 
 FILE_PATH = Path(__file__).resolve().parents[0]
-IN_PATH = (FILE_PATH / '../../data/preprocessed_content.json').resolve()
+IN_PATH = (FILE_PATH / '../../data/preprocessed_wsj6_.json').resolve()
 STOCK_PATH = (FILE_PATH / '../../data/sp500.csv').resolve()
 MODEL_PATH = (FILE_PATH / '../../models/news_model1.h5').resolve()
 
@@ -135,11 +135,12 @@ def main():
     x, y = read_stocks(STOCK_PATH)
     news = read_news(IN_PATH)
     smooth_y = smooth(y, half_window=SMOOTH_SIZE)
+    news = sorted(news, key=lambda x: x['date'])
     news = prune_news(news, max_date=x[-1])
-    news = add_labels_classification(x, smooth_y, news, next_windows=[4])  #, multiplier=100, limits=10)
-    # news = add_labels(x, smooth_y, news, next_windows=[4])  # , multiplier=100, limits=10)
+    # news = add_labels_classification(x, smooth_y, news)  #, multiplier=100, limits=10)
+    news = add_labels(x, smooth_y, news)  # , multiplier=100, limits=10)
     # news = rebalance(news, multiplier=100)
-    #  plot_ground_truth_per_article(x, smooth_y, news)
+    plot_ground_truth_per_article(x, smooth_y, news)
 
     # ---------------------------------------------------------------------------
     corpus = [' '.join(article['word_vector']) for article in news]
@@ -155,37 +156,37 @@ def main():
     print(X.shape)
     print(Y.shape)
 
-    X_train, Y_train, X_test, Y_test = gen_training_tree(X, Y, test_size=0.4)
+    X_train, Y_train, X_test, Y_test = gen_training_tree(X, Y, test_size=0.5)
 
     # clf = tree.DecisionTreeRegressor()
-    # clf = RandomForestRegressor()
+    clf = RandomForestRegressor()
     # clf = tree.DecisionTreeClassifier()
-    clf = RandomForestClassifier(random_state=0)
+    # clf = RandomForestClassifier(random_state=0)
     clf = clf.fit(X_train, Y_train)
 
     print(Y_train.shape, Y_test.shape)
 
     predicted_y = clf.predict(X_train)
-    # diff = [(predicted_y[i] - Y_train[i]) for i in range(len(Y_train))]
-    # plt.figure()
-    # plt.title('Train')
-    # plt.xlabel('Predicted')
-    # plt.ylabel('Real')
-    # plt.scatter(predicted_y, Y_train, c=diff, alpha=0.8)
-    # plt.show()
+    diff = [(predicted_y[i] - Y_train[i]) for i in range(len(Y_train))]
+    plt.figure()
+    plt.title('Train')
+    plt.xlabel('Predicted')
+    plt.ylabel('Real')
+    plt.scatter(predicted_y, Y_train, c=diff, alpha=0.8)
+    plt.show()
 
-    print(confusion_matrix(predicted_y, Y_train))
+    # print(confusion_matrix(predicted_y, Y_train))
 
     predicted_y = clf.predict(X_test)
-    # diff = [(predicted_y[i] - Y_test[i]) for i in range(len(Y_test))]
-    # plt.figure()
-    # plt.title('Test')
-    # plt.xlabel('Predicted')
-    # plt.ylabel('Real')
-    # plt.scatter(predicted_y, Y_test, c=diff, alpha=0.8)
-    # plt.show()
+    diff = [(predicted_y[i] - Y_test[i]) for i in range(len(Y_test))]
+    plt.figure()
+    plt.title('Test')
+    plt.xlabel('Predicted')
+    plt.ylabel('Real')
+    plt.scatter(predicted_y, Y_test, c=diff, alpha=0.8)
+    plt.show()
 
-    print(confusion_matrix(predicted_y, Y_test))
+    # print(confusion_matrix(predicted_y, Y_test))
 
 
 if __name__ == '__main__':

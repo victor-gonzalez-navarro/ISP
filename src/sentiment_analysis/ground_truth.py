@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -7,10 +8,8 @@ import numpy as np
 import pandas as pd
 from matplotlib.colors import hsv_to_rgb
 from pandas.plotting import register_matplotlib_converters
-from tqdm import tqdm
 
 from utils import smooth
-
 
 FILE_PATH = Path(__file__).resolve().parents[0]
 IN_PATH = (FILE_PATH / '../../data/preprocessed.json').resolve()
@@ -26,7 +25,10 @@ def read_news(path: Path):
     with path.open('r') as f:
         data = json.load(f)
     for article in data:
-        article['date'] = datetime.strptime(article['date'], '%Y-%m-%d %H:%M:%S')
+        if re.search(r'\d\d/\d\d/\d\d', article['date']):
+            article['date'] = datetime.strptime(article['date'], '%m/%d/%y')
+        else:
+            article['date'] = datetime.strptime(article['date'], '%Y-%m-%d %H:%M:%S')
     return data
 
 
@@ -53,16 +55,16 @@ def findy(x, y, d):
     return y[idx]
 
 
-def select_color(value):
-    value = np.clip(value, 0.9, 1.1)
+def select_color(value, multiplier=1.0):
+    value = np.clip(value / multiplier, 0.9, 1.1)
     h = ((value - 0.9) / 0.2) * 120.0 / 360.0
     s = 1.0
     v = 1.0
     return hsv_to_rgb((h, s, v))
 
 
-def plot_ground_truth_per_article(x, y, news, window_size=WINDOW_PLOT_SIZE):
-    colors = [select_color(article[window_size]) for article in news]
+def plot_ground_truth_per_article(x, y, news, window_size=WINDOW_PLOT_SIZE, multiplier=1.0):
+    colors = [select_color(article[window_size], multiplier) for article in news]
     news_x = [article['date'] for article in news]
     news_y = [findy(x, y, article['date']) for article in news]
 
@@ -78,7 +80,7 @@ def prune_news(news, max_date):
     return [article for article in news if article['date'] < max_date]
 
 
-def add_labels(x, y, news, prev_window=0, next_windows=WINDOWS_SIZES):
+def add_labels(x, y, news, prev_window=0, next_windows=WINDOWS_SIZES, multiplier=1, limits=None, rebalance=False, rebalance_limit=0.05):
     assert all(news[i]['date'] <= news[i + 1]['date'] for i in range(len(news) - 1))  # Assert sorted
 
     offset = 0
@@ -89,7 +91,47 @@ def add_labels(x, y, news, prev_window=0, next_windows=WINDOWS_SIZES):
         article['windows'] = next_windows
         for next_window in next_windows:
             end = min(len(y) - 1, idx + next_window)
-            article[next_window] = y[end] / y[start]
+            article[next_window] = (y[end] / y[start]) * multiplier
+
+            if limits and (article[next_window] - multiplier) > limits:
+                article[next_window] = multiplier + limits
+            if limits and (multiplier - article[next_window]) > limits:
+                article[next_window] = multiplier - limits
+
+        offset = idx
+
+    return news
+
+
+def add_labels_classification(x, y, news, prev_window=0, next_windows=WINDOWS_SIZES):
+    assert all(news[i]['date'] <= news[i + 1]['date'] for i in range(len(news) - 1))  # Assert sorted
+
+    offset = 0
+    for article in news:
+        idx = next(i for i, v in enumerate(x[offset:]) if v >= article['date']) + offset
+        start = max(0, idx - prev_window)
+
+        article['windows'] = next_windows
+        for next_window in next_windows:
+            end = min(len(y) - 1, idx + next_window)
+            val = y[end] / y[start]
+            label = 0
+
+            # if val > 1.0:
+            #     if val - 1.0 < 0.005: label = 4
+            #     elif val - 1.0 < 0.02: label = 5
+            #     else: label = 6
+            # else:
+            #     if 1.0 - val < 0.005: label = 3
+            #     elif 1.0 - val < 0.02: label = 2
+            #     else: label = 1
+
+            if val >= 1.0:
+                label = 1
+            else:
+                label = 0
+
+            article[next_window] = label
         offset = idx
 
     return news
@@ -125,7 +167,7 @@ def main():
     if PLOT:
         plot_ground_truth_per_article(x, smooth_y, news)
 
-    gt = generate_daily_values(news, begin=news[1000]['date'], end=x[-1])
+    # gt = generate_daily_values(news, begin=news[1000]['date'], end=x[-1])
 
 
 if __name__ == '__main__':

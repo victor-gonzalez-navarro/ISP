@@ -10,9 +10,13 @@ from utils import smooth
 from keras.preprocessing import sequence
 from sklearn.model_selection import train_test_split
 from tensorflow.python.client import device_lib
-from matplotlib.colors import hsv_to_rgb
-from src.sentiment_analysis.ground_truth import read_news, read_stocks, prune_news, add_labels
+from src.sentiment_analysis.ground_truth import read_news, read_stocks, prune_news, add_labels_classification, add_labels
 
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import confusion_matrix
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.tree import _tree
+from sklearn import tree
 from sentiment_analysis.NNModel import NNModel
 
 from pandas.plotting import register_matplotlib_converters
@@ -40,14 +44,14 @@ def init():
     print('Using ', device_lib.list_local_devices()[-1].name)
 
 
-def rebalance(news, rebalance_limit=0.05):
+def rebalance(news, rebalance_limit=0.05, multiplier=1):
     pos_samples = []
     neg_samples = []
 
     for article in news:
         avg_val = np.average([article[next_window] for next_window in article['windows']])
 
-        if avg_val >= 1.0:
+        if avg_val >= 1.0 * multiplier:
             pos_samples.append(article)
         else:
             neg_samples.append(article)
@@ -63,6 +67,26 @@ def rebalance(news, rebalance_limit=0.05):
         return sorted(rebalanced_news, key=lambda x: x['date'])
 
     return news
+
+
+def unison_shuffled_copies(a, b):
+    assert a.shape[0] == b.shape[0]
+    p = np.random.permutation(a.shape[0])
+    return a[p], b[p]
+
+
+def gen_training_tree(X, Y, test_size):
+    assert X.shape[0] == Y.shape[0]
+
+    X, Y = unison_shuffled_copies(X, Y)
+    length = X.shape[0]
+    train_size = length - int(test_size * length)
+
+    X_train = X[:train_size]
+    X_test = X[train_size:]
+    Y_train = Y[:train_size]
+    Y_test = Y[train_size:]
+    return X_train, Y_train, X_test, Y_test
 
 
 def gen_training(news, test_size, max_input_len, has_embeddings=True):
@@ -82,6 +106,29 @@ def gen_training(news, test_size, max_input_len, has_embeddings=True):
     return x_train, y_train, x_test, y_test
 
 
+def tree_to_code(tree, feature_names):
+    tree_ = tree.tree_
+    feature_name = [
+        feature_names[i] if i != _tree.TREE_UNDEFINED else "undefined!"
+        for i in tree_.feature
+    ]
+    print("def tree({}):".format(", ".join(feature_names)))
+
+    def recurse(node, depth):
+        indent = "  " * depth
+        if tree_.feature[node] != _tree.TREE_UNDEFINED:
+            name = feature_name[node]
+            threshold = tree_.threshold[node]
+            print("{}if {} <= {}:".format(indent, name, threshold))
+            recurse(tree_.children_left[node], depth + 1)
+            print("{}else:  # if {} > {}".format(indent, name, threshold))
+            recurse(tree_.children_right[node], depth + 1)
+        else:
+            print("{}return {}".format(indent, tree_.value[node]))
+
+    recurse(0, 1)
+
+
 def main():
     init()
 
@@ -89,10 +136,58 @@ def main():
     news = read_news(IN_PATH)
     smooth_y = smooth(y, half_window=SMOOTH_SIZE)
     news = prune_news(news, max_date=x[-1])
-    news = add_labels(x, smooth_y, news)
-    news = rebalance(news)
+    news = add_labels_classification(x, smooth_y, news, next_windows=[1]) #, multiplier=100, limits=10)
+    # news = add_labels(x, smooth_y, news, next_windows=[4])  # , multiplier=100, limits=10)
+    # news = rebalance(news, multiplier=100)
     #  plot_ground_truth_per_article(x, smooth_y, news)
 
+    # ---------------------------------------------------------------------------
+    corpus = [article['txt'] for article in news]
+    vectorizer = CountVectorizer(max_features=2000)
+    window_size = news[0]['windows'][0]
+    print('Window size: ', window_size)
+
+    X = vectorizer.fit_transform(corpus)
+    print(vectorizer.get_feature_names())
+    Y = np.array([article[window_size] for article in news])
+
+    print(vectorizer.get_feature_names())
+    print(X.shape)
+    print(Y.shape)
+
+    X_train, Y_train, X_test, Y_test = gen_training_tree(X, Y, test_size=0.5)
+
+    # clf = tree.DecisionTreeRegressor()
+    clf = tree.DecisionTreeClassifier()
+    # clf = RandomForestClassifier(random_state=0)
+    clf = clf.fit(X_train, Y_train)
+
+    print(Y_train.shape, Y_test.shape)
+
+    predicted_y = clf.predict(X_train)
+    #diff = [(predicted_y[i] - Y_train[i]) for i in range(len(Y_train))]
+    ##plt.figure()
+    ##plt.title('Train')
+    #plt.xlabel('Predicted')
+    #plt.ylabel('Real')
+    #plt.scatter(predicted_y, Y_train, c=diff, alpha=0.8)
+    #plt.show()
+
+    print(confusion_matrix(predicted_y, Y_train))
+
+    predicted_y = clf.predict(X_test)
+    ##diff = [(predicted_y[i] - Y_test[i]) for i in range(len(Y_test))]
+    #plt.figure()
+    #plt.title('Test')
+    #plt.xlabel('Predicted')
+    #plt.ylabel('Real')
+    #plt.scatter(predicted_y, Y_test, c=diff, alpha=0.8)
+    #plt.show()
+
+    print(confusion_matrix(predicted_y, Y_test))
+
+    # tree_to_code(clf, ['a', 'b'])
+    exit()
     # --- Train ---
     word2vec_model = GensimModel(W2V_MODEL_NAME)  # BOWModel()
     x_train, y_train, x_test, y_test = gen_training(news, test_size=0.3, max_input_len=MAX_INPUT_LEN)

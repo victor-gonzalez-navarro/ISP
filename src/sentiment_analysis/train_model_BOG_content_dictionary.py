@@ -6,10 +6,14 @@ import random
 from sentiment_analysis.w2v_models import GensimModel
 import matplotlib.pyplot as plt
 import numpy as np
+from tqdm import tqdm
+from matplotlib.colors import hsv_to_rgb
 from utils import smooth
 from keras.preprocessing import sequence
 from sklearn.model_selection import train_test_split
 from tensorflow.python.client import device_lib
+from nltk.stem.porter import PorterStemmer
+from collections import defaultdict
 from src.sentiment_analysis.ground_truth import read_news, read_stocks, prune_news, add_labels_classification, add_labels, plot_ground_truth_per_article
 
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -24,6 +28,8 @@ from pandas.plotting import register_matplotlib_converters
 
 FILE_PATH = Path(__file__).resolve().parents[0]
 IN_PATH = (FILE_PATH / '../../data/preprocessed_content.json').resolve()
+NEGATIVE_PATH = (FILE_PATH / '../../data/negative_words.txt').resolve()
+POSITIVE_PATH = (FILE_PATH / '../../data/positive_words.txt').resolve()
 STOCK_PATH = (FILE_PATH / '../../data/sp500.csv').resolve()
 MODEL_PATH = (FILE_PATH / '../../models/news_model1.h5').resolve()
 
@@ -128,6 +134,56 @@ def tree_to_code(tree, feature_names):
     recurse(0, 1)
 
 
+def load_words(path: Path):
+    words = []
+    with path.open('r') as f:
+        for line in f:
+            word = line.strip().lower()
+            if len(word) > 0:
+                words.append(word)
+
+    return words
+
+
+def print_lines(txt, line_length=90):
+    while len(txt) > line_length:
+        if txt[0] == ' ':
+            txt = txt.strip()
+        else:
+            length = line_length + txt[line_length:].find(' ')
+            print(txt[:length])
+            txt = txt[length:]
+    print(txt.strip())
+
+
+def findy(x, y, d):
+    idx = 0
+    while x[idx] <= d:
+        idx += 1
+    return y[idx]
+
+
+def select_color(score):
+    value = np.clip(score, -20, 20)
+    h = ((value + 20) / 40) * 120.0 / 360.0
+    s = 1.0
+    v = 1.0
+    return hsv_to_rgb((h, s, v))
+
+
+def plot_ground_truth_per_article2(x, y, news):
+    colors = [select_color(article['score']) for article in news]
+    news_x = [article['date'] for article in news]
+    news_y = [findy(x, y, article['date']) for article in news]
+
+    plt.figure()
+    plt.plot(x, y, alpha=0.6, label='%s Stock', zorder=0)
+    plt.scatter(news_x, news_y, alpha=0.8, s=8, c=colors, zorder=1)
+    plt.xticks(rotation=30)
+    plt.legend()
+    plt.show()
+
+
 def main():
     init()
 
@@ -139,31 +195,143 @@ def main():
     news = add_labels(x, smooth_y, news, multiplier=100, limits=10)
     news = rebalance(news, multiplier=100)
     # plot_ground_truth_per_article(x, smooth_y, news, multiplier=100)
+    windows = news[0]['windows']
+
+    # for article in news:
+    #     if 'imagerendition' in article['word_vector']:
+    #         print_lines(article['content'])
+    #         exit()
+
+    length_pos = 0
+    for article in news:
+        if article[windows[0]] > 100:
+            length_pos += len(article['word_vector'])
+    print(length_pos)
+    length_neg = 0
+    for article in news:
+        if article[windows[0]] < 100:
+            length_neg += len(article['word_vector'])
+    print(length_neg)
+
+
+    stemmer = PorterStemmer()
+    # ----------------------------------------------------------------- POSITIVE
+    global_dict = defaultdict(lambda: 0)
+    for article in news:
+        if article[windows[0]] > 100:
+            article_dict = []
+            for token in article['word_vector']:
+                # token = stemmer.stem(token)
+                article_dict.append(token)
+
+            for k in article_dict:
+                global_dict[k] += 1
+
+    average_dict = {}
+    for k, v in global_dict.items():
+        average_dict[k] = np.average(v)
+
+    sorted_dict_pos = {k: v for k, v in reversed(sorted(average_dict.items(), key=lambda item: item[1]))}
+    ks = []
+    vs = []
+    for k, v in sorted_dict_pos.items():
+        if v > 1.0:
+            ks.append(k)
+            vs.append(v)
+
+    # for k in ks:
+    #     print('{:9s}'.format(k), end=' ')
+    # print()
+    # for v in vs:
+    #     print('{:<9d}'.format(int(v)), end=' ')
+    # print()
+
+    # ----------------------------------------------------------------- NEGATIVE
+    global_dict = defaultdict(lambda: 0)
+    for article in news:
+        if article[windows[0]] < 100:
+            article_dict = []
+            for token in article['word_vector']:
+                # token = stemmer.stem(token)
+                article_dict.append(token)
+
+            for k in article_dict:
+                global_dict[k] += 1
+
+    average_dict = {}
+    for k, v in global_dict.items():
+        average_dict[k] = np.average(v)
+
+    sorted_dict_neg = {k: v for k, v in reversed(sorted(average_dict.items(), key=lambda item: item[1]))}
+    ks = []
+    vs = []
+    for k, v in sorted_dict_neg.items():
+        if v > 1.0:
+            ks.append(k)
+            vs.append(v)
+
+    # for k in ks:
+    #     print('{:9s}'.format(k), end=' ')
+    # print()
+    # for v in vs:
+    #     print('{:<9d}'.format(int(v)), end=' ')
+    # print()
 
     # -----------------------------------------------------------------
-    word2vec_model = GensimModel('glove-wiki-gigaword-50')
-    x_train, y_train, x_test, y_test = gen_training(news, test_size=0.3, max_input_len=MAX_INPUT_LEN)
+    total = defaultdict(lambda: 0)
+    for k, v in sorted_dict_pos.items():
+        total[k] += v
+    for k, v in sorted_dict_neg.items():
+        total[k] += v
 
-    model = NNModel(word2vec_model.generate_embedding_layer(MAX_INPUT_LEN, trainable=False))
-    model.compile(loss='mse', optimizer='adam', metrics=['mean_squared_error'])
-    #  model.load_weights(MODEL_PATH)
-    history = model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=20, batch_size=64)
-    #  model.save_weights(MODEL_PATH)
+    sorted_total = {k: v for k, v in reversed(sorted(total.items(), key=lambda item: item[1]))}
+    words = []
+    for k, v in sorted_total.items():
+        if v > 1.0:
+            words.append(k)
 
-    # Plot training & validation loss values
-    plt.plot(history.history['loss'])
-    plt.plot(history.history['val_loss'])
-    plt.title('Model loss')
-    plt.ylabel('Loss (mse)')
-    plt.xlabel('Epoch')
-    plt.legend(['Train', 'Test'], loc='upper left')
-    plt.show()
+    i = 15
+    while i < len(words):
+        for word in words[(i-15):i]:
+            print('{:15s}'.format(word[:20]), end=' ')
+        print()
+        for word in words[(i-15):i]:
+            pos = (sorted_dict_pos[word] if word in sorted_dict_pos else 0.0) * 100 / length_pos
+            neg = (sorted_dict_neg[word] if word in sorted_dict_neg else 0.0) * 100/ length_neg
+            print('{:.2f}|{:<.2f}      '.format(pos, neg), end=' ')
+        print()
+        print()
+        i += 15
 
-    predicted_y = model.predict(x_train)
-    diff = [(predicted_y[i] - y_train[i]) for i in range(len(y_train))]
+    exit()
+    # -----------------------------------------------------------------
+    negative = set(load_words(NEGATIVE_PATH))
+    positive = set(load_words(POSITIVE_PATH))
+
+    xx = []
+    yy = []
+    cc = []
+    for i, article in enumerate(tqdm(news)):
+        count_negative = 0
+        count_positive = 0
+        for token in article['word_vector']:
+            if token in negative:
+                count_negative += 1
+            if token in positive:
+                count_positive += 1
+
+        news[i]['score'] = count_positive - count_negative
+        xx.append(count_positive - count_negative)
+        yy.append(article[windows[3]])
+        cc.append(0)
+
     plt.figure()
-    plt.scatter(predicted_y, y_train, c=diff, alpha=0.8)
+    plt.scatter(xx, yy, c=cc, alpha=0.2)
+    plt.xlabel('score')
+    plt.ylabel('label')
     plt.show()
+
+    plot_ground_truth_per_article2(x, y, news)
 
 
 if __name__ == '__main__':

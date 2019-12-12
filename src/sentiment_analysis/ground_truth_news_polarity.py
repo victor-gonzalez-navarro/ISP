@@ -1,5 +1,6 @@
 import json
 import re
+import csv
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -12,7 +13,7 @@ from pandas.plotting import register_matplotlib_converters
 from utils import smooth
 
 FILE_PATH = Path(__file__).resolve().parents[0]
-IN_PATH = (FILE_PATH / '../../data/preprocessed.json').resolve()
+IN_PATH = (FILE_PATH / '../../data/news_polarity.csv').resolve()
 STOCK_PATH = (FILE_PATH / '../../data/sp500.csv').resolve()
 SMOOTH_SIZE = 3
 PLOT = False
@@ -22,14 +23,15 @@ WINDOW_PLOT_SIZE = WINDOWS_SIZES[1]
 
 
 def read_news(path: Path):
+    news = []
     with path.open('r') as f:
-        data = json.load(f)
-    for article in data:
-        if re.search(r'\d\d/\d\d/\d\d', article['date']):
-            article['date'] = datetime.strptime(article['date'], '%m/%d/%y')
-        else:
-            article['date'] = datetime.strptime(article['date'], '%Y-%m-%d %H:%M:%S')
-    return data
+        csv_reader = csv.reader(f, delimiter=',')
+        for row in csv_reader:
+            item = {}
+            item['date'] = datetime.strptime(row[0], '%m/%d/%y')
+            item['polarity'] = float(row[1])
+            news.append(item)
+    return news
 
 
 def read_stocks(path: Path, start=None, end=None, normalize=True):
@@ -55,22 +57,22 @@ def findy(x, y, d):
     return y[idx]
 
 
-def select_color(value, multiplier=1.0):
-    value = np.clip(value / multiplier, 0.9, 1.1)
-    h = ((value - 0.9) / 0.2) * 120.0 / 360.0
+def select_color(value):
+    value = np.clip(value, -0.08, +0.08)
+    h = ((value + 0.08) / 0.16) * 120.0 / 360.0
     s = 1.0
     v = 1.0
     return hsv_to_rgb((h, s, v))
 
 
 def plot_ground_truth_per_article(x, y, news, window_size=WINDOW_PLOT_SIZE, multiplier=1.0):
-    colors = [select_color(article[window_size], multiplier) for article in news]
+    colors = [select_color(article['polarity']) for article in news]
     news_x = [article['date'] for article in news]
     news_y = [findy(x, y, article['date']) for article in news]
 
     plt.figure()
     plt.plot(x, y, alpha=0.8, label='%s Stock', zorder=0)
-    plt.scatter(news_x, news_y, alpha=0.8, s=4, c=colors, zorder=1)
+    plt.scatter(news_x, news_y, alpha=0.8, s=20, c=colors, zorder=1)
     plt.xticks(rotation=30)
     plt.legend()
     plt.show()
@@ -162,12 +164,7 @@ def main():
     x, y = read_stocks(STOCK_PATH)
     smooth_y = smooth(y, half_window=SMOOTH_SIZE)
     news = prune_news(news, max_date=x[-1])
-    news = add_labels(x, smooth_y, news)
-
-    if PLOT:
-        plot_ground_truth_per_article(x, smooth_y, news)
-
-    # gt = generate_daily_values(news, begin=news[1000]['date'], end=x[-1])
+    plot_ground_truth_per_article(x, smooth_y, news)
 
 
 if __name__ == '__main__':

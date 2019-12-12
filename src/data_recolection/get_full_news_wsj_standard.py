@@ -34,7 +34,7 @@ def print_lines(txt, line_length=90):
     print(txt.strip())
 
 
-def get_html(url):
+def get_html(url, use_cookies=True):
     cookies = {
         'DJSESSION': 'country%3Des%7C%7Ccontinent%3Deu%7C%7Cregion%3D%7C%7Ccity%3Dmadrid%7C%7Clatitude%3D40.40%7C%7Clongitude%3D-3.68%7C%7Ctimezone%3Dgmt%2B1',
         'wsjregion': 'europe%2Ces',
@@ -87,19 +87,36 @@ def get_html(url):
         }
 
     headers = {'User-Agent': 'Mozilla/5.0'}
-    response = requests.get(url, cookies=cookies, headers=headers)
+    if use_cookies:
+        response = requests.get(url, cookies=cookies, headers=headers)
+    else:
+        response = requests.get(url, headers=headers)
     return response.text
 
 
 def main():
+    BASE = 'https://www.wsj.com/search/term.html?KEYWORDS=Apple&min-date=2015/12/12&max-date=2019/12/12&isAdvanced=true&daysback=4y&andor=AND&sort=date-desc&source=wsjarticle,wsjblogs,wsjvideo,interactivemedia,sitesearch,wsjpro&page='
+    urls = []
+    times = []
+    for page in tqdm(range(1, 590)):
+        url = BASE + str(page)
+        html = get_html(url, use_cookies=False)
 
-    with IN_PATH.open('r', encoding='utf-8') as f:
-        data = json.load(f)
-    data = [d for d in data if d['source'] != 'WSJ Video']
+        items = re.findall(r'<div\s+class="category">(.*?)</div>.*?<h3\s+class="headline">\s+<a\s+href="(.*?)">.*?<time\s+class="date-stamp-container">(.*?)</time>', html, re.DOTALL)
+
+        for item in items:
+            if 'WSJ Pro' not in item[0]:
+                urls.append('https://www.wsj.com' + item[1])
+                times.append(item[2])
+
+        time.sleep(0.1)
+
+    print(urls)
+    print(times)
 
     new_data = []
-    for d in tqdm(data):
-        html = get_html(d['url'])
+    for url in tqdm(urls):
+        html = get_html(url)
 
         parsed_html = BeautifulSoup(html, 'html.parser')
 
@@ -132,14 +149,17 @@ def main():
         for p in paragraphs[:-1]:
             content += ' ' + p.text
 
+        d = {}
         d['title'] = title.text.strip() if title else None
         d['desc'] = desc.text.strip() if desc else None
         d['content'] = re.sub(r'\s+', ' ', content).strip()
+        d['source'] = 'The Wall Street Journal'
+        d['url'] = url
         new_data.append(d)
 
         time.sleep(1)
 
-    with open('../../data/preprocessed_wsj.json', 'w') as f:
+    with open('../../data/preprocessed_wsj_all.json', 'w') as f:
         json.dump(new_data, f, indent=4, sort_keys=True, default=str)
 
 

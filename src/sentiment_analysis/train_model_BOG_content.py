@@ -12,7 +12,7 @@ from sklearn.model_selection import train_test_split
 from tensorflow.python.client import device_lib
 from src.sentiment_analysis.ground_truth import read_news, read_stocks, prune_news, add_labels_classification, add_labels
 
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import confusion_matrix
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.tree import _tree
@@ -23,9 +23,9 @@ from pandas.plotting import register_matplotlib_converters
 
 
 FILE_PATH = Path(__file__).resolve().parents[0]
-IN_PATH = (FILE_PATH / '../../data/preprocessed.json').resolve()
+IN_PATH = (FILE_PATH / '../../data/preprocessed_content.json').resolve()
 STOCK_PATH = (FILE_PATH / '../../data/sp500.csv').resolve()
-MODEL_PATH = (FILE_PATH / '../../models/news_model.h5').resolve()
+MODEL_PATH = (FILE_PATH / '../../models/news_model1.h5').resolve()
 
 BEGIN_TIME = datetime(year=2007, month=1, day=1)
 END_TIME = datetime(year=2008, month=1, day=4)
@@ -136,13 +136,13 @@ def main():
     news = read_news(IN_PATH)
     smooth_y = smooth(y, half_window=SMOOTH_SIZE)
     news = prune_news(news, max_date=x[-1])
-    news = add_labels_classification(x, smooth_y, news, next_windows=[1]) #, multiplier=100, limits=10)
+    news = add_labels_classification(x, smooth_y, news, next_windows=[4])  #, multiplier=100, limits=10)
     # news = add_labels(x, smooth_y, news, next_windows=[4])  # , multiplier=100, limits=10)
     # news = rebalance(news, multiplier=100)
     #  plot_ground_truth_per_article(x, smooth_y, news)
 
     # ---------------------------------------------------------------------------
-    corpus = [article['txt'] for article in news]
+    corpus = [' '.join(article['word_vector']) for article in news]
     vectorizer = CountVectorizer(max_features=2000)
     window_size = news[0]['windows'][0]
     print('Window size: ', window_size)
@@ -155,66 +155,37 @@ def main():
     print(X.shape)
     print(Y.shape)
 
-    X_train, Y_train, X_test, Y_test = gen_training_tree(X, Y, test_size=0.5)
+    X_train, Y_train, X_test, Y_test = gen_training_tree(X, Y, test_size=0.4)
 
     # clf = tree.DecisionTreeRegressor()
-    clf = tree.DecisionTreeClassifier()
-    # clf = RandomForestClassifier(random_state=0)
+    # clf = RandomForestRegressor()
+    # clf = tree.DecisionTreeClassifier()
+    clf = RandomForestClassifier(random_state=0)
     clf = clf.fit(X_train, Y_train)
 
     print(Y_train.shape, Y_test.shape)
 
     predicted_y = clf.predict(X_train)
-    #diff = [(predicted_y[i] - Y_train[i]) for i in range(len(Y_train))]
-    ##plt.figure()
-    ##plt.title('Train')
-    #plt.xlabel('Predicted')
-    #plt.ylabel('Real')
-    #plt.scatter(predicted_y, Y_train, c=diff, alpha=0.8)
-    #plt.show()
+    # diff = [(predicted_y[i] - Y_train[i]) for i in range(len(Y_train))]
+    # plt.figure()
+    # plt.title('Train')
+    # plt.xlabel('Predicted')
+    # plt.ylabel('Real')
+    # plt.scatter(predicted_y, Y_train, c=diff, alpha=0.8)
+    # plt.show()
 
     print(confusion_matrix(predicted_y, Y_train))
 
     predicted_y = clf.predict(X_test)
-    ##diff = [(predicted_y[i] - Y_test[i]) for i in range(len(Y_test))]
-    #plt.figure()
-    #plt.title('Test')
-    #plt.xlabel('Predicted')
-    #plt.ylabel('Real')
-    #plt.scatter(predicted_y, Y_test, c=diff, alpha=0.8)
-    #plt.show()
+    # diff = [(predicted_y[i] - Y_test[i]) for i in range(len(Y_test))]
+    # plt.figure()
+    # plt.title('Test')
+    # plt.xlabel('Predicted')
+    # plt.ylabel('Real')
+    # plt.scatter(predicted_y, Y_test, c=diff, alpha=0.8)
+    # plt.show()
 
     print(confusion_matrix(predicted_y, Y_test))
-
-    # tree_to_code(clf, ['a', 'b'])
-    exit()
-    # --- Train ---
-    word2vec_model = GensimModel(W2V_MODEL_NAME)  # BOWModel()
-    x_train, y_train, x_test, y_test = gen_training(news, test_size=0.3, max_input_len=MAX_INPUT_LEN)
-
-    model = NNModel(word2vec_model.generate_embedding_layer(MAX_INPUT_LEN, trainable=False))
-    model.compile(loss='mse', optimizer='adam', metrics=['mean_squared_error'])
-    #  model.load_weights(MODEL_PATH)
-    history = model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=150, batch_size=64)
-    #  model.save_weights(MODEL_PATH)
-
-    # Plot training & validation loss values
-    plt.plot(history.history['loss'])
-    plt.plot(history.history['val_loss'])
-    plt.title('Model loss')
-    plt.ylabel('Loss (mse)')
-    plt.xlabel('Epoch')
-    plt.legend(['Train', 'Test'], loc='upper left')
-    plt.show()
-
-    predicted_y = model.predict(x_train)
-    diff = [(predicted_y[i] - y_train[i]) for i in range(len(y_train))]
-    plt.figure()
-    plt.scatter(predicted_y, y_train, c=diff, alpha=0.8)
-    axes = plt.gca()
-    axes.set_xlim([-0.2, 0.2])
-    axes.set_ylim([-0.2, 0.2])
-    plt.show()
 
 
 if __name__ == '__main__':

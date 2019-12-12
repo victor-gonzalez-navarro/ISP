@@ -27,7 +27,7 @@ from pandas.plotting import register_matplotlib_converters
 
 
 FILE_PATH = Path(__file__).resolve().parents[0]
-IN_PATH = (FILE_PATH / '../../data/preprocessed_content.json').resolve()
+IN_PATH = (FILE_PATH / '../../data/preprocessed_wsj6_.json').resolve()
 NEGATIVE_PATH = (FILE_PATH / '../../data/negative_words.txt').resolve()
 POSITIVE_PATH = (FILE_PATH / '../../data/positive_words.txt').resolve()
 STOCK_PATH = (FILE_PATH / '../../data/sp500.csv').resolve()
@@ -190,6 +190,7 @@ def main():
     x, y = read_stocks(STOCK_PATH)
     news = read_news(IN_PATH)
     smooth_y = smooth(y, half_window=SMOOTH_SIZE)
+    news = sorted(news, key=lambda x: x['date'])
     news = prune_news(news, max_date=x[-1])
     # news = add_labels_classification(x, smooth_y, news, next_windows=[4])  #, multiplier=100, limits=10)
     news = add_labels(x, smooth_y, news, multiplier=100, limits=10)
@@ -201,13 +202,6 @@ def main():
     #     if 'imagerendition' in article['word_vector']:
     #         print_lines(article['content'])
     #         exit()
-
-    for i, article in enumerate(news):
-        if i > 5 and article[windows[0]] < 100 and article[windows[1]] < 100 and article[windows[2]] < 100:
-            print_lines(article['content'])
-            print(i, article[windows[0]], article[windows[1]], article[windows[2]])
-            plot_ground_truth_per_article(x, smooth_y, [article], multiplier=100)
-            exit()
 
     length_pos = 0
     for article in news:
@@ -297,19 +291,20 @@ def main():
         if v > 1.0:
             words.append(k)
 
-    i = 25
+    i = 15
     while i < len(words):
-        for word in words[(i-25):i]:
-            print('{:9s}'.format(word[:20]), end=' ')
+        for word in words[(i-15):i]:
+            print('{:15s}'.format(word[:20]), end=' ')
         print()
-        for word in words[(i-25):i]:
+        for word in words[(i-15):i]:
             pos = (sorted_dict_pos[word] if word in sorted_dict_pos else 0.0) * 100 / length_pos
             neg = (sorted_dict_neg[word] if word in sorted_dict_neg else 0.0) * 100/ length_neg
-            print('{:.2f}|{:<.2f}'.format(pos, neg), end=' ')
+            print('{:.2f}|{:<.2f}      '.format(pos, neg), end=' ')
         print()
-        i += 25
+        print()
+        i += 15
 
-    exit()
+    #exit()
     # -----------------------------------------------------------------
     negative = set(load_words(NEGATIVE_PATH))
     positive = set(load_words(POSITIVE_PATH))
@@ -328,7 +323,7 @@ def main():
 
         news[i]['score'] = count_positive - count_negative
         xx.append(count_positive - count_negative)
-        yy.append(article[windows[3]])
+        yy.append(article[windows[0]])
         cc.append(0)
 
     plt.figure()

@@ -10,8 +10,9 @@ from utils import smooth
 from keras.preprocessing import sequence
 from sklearn.model_selection import train_test_split
 from tensorflow.python.client import device_lib
-from src.sentiment_analysis.ground_truth import read_news, read_stocks, prune_news, add_labels_classification
+from src.sentiment_analysis.ground_truth import read_news, read_stocks, prune_news, add_labels
 
+from tqdm import tqdm
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix
 from sklearn.feature_extraction.text import CountVectorizer
@@ -135,9 +136,36 @@ def main():
     news = read_news(IN_PATH)
     smooth_y = smooth(y, half_window=SMOOTH_SIZE)
     news = prune_news(news, max_date=x[-1])
-    news = add_labels_classification(x, smooth_y, news) #, multiplier=100, limits=10)
+    news = add_labels(x, smooth_y, news, multiplier=100, limits=10)
     # news = rebalance(news, multiplier=100)
     #  plot_ground_truth_per_article(x, smooth_y, news)
+
+    import nltk
+    nltk.download('vader_lexicon')
+    from nltk.sentiment.vader import SentimentIntensityAnalyzer
+
+    for article in news:
+        if article[news[0]['windows'][1]] < 95:
+            print(article['txt'])
+    exit()
+
+    for window_size in news[0]['windows']:
+        Y_train = []
+        predicted_y = []
+        for article in tqdm(news):
+            sid = SentimentIntensityAnalyzer()
+            predicted_y.append(sid.polarity_scores(article['txt'])['compound'])
+            Y_train.append(article[window_size])
+
+        diff = [(predicted_y[i] - Y_train[i]) for i in range(len(Y_train))]
+        plt.figure()
+        plt.title('WS: ' + str(window_size))
+        plt.xlabel('Predicted')
+        plt.ylabel('Real')
+        plt.scatter(predicted_y, Y_train, c=diff, alpha=0.8)
+        plt.show()
+
+    exit()
 
     # ---------------------------------------------------------------------------
     corpus = [' '.join(article['word_list']) for article in news]

@@ -5,9 +5,10 @@ import json
 from random import sample
 from pathlib import Path
 from nltk.corpus import wordnet
-#from sentiment_analysis.w2v_models import GensimModel
+from sentiment_analysis.w2v_models import GensimModel
 from utils import logger
-#from tensorflow.python.client import device_lib
+from tensorflow.python.client import device_lib
+from nltk.stem.porter import PorterStemmer
 from tqdm import tqdm
 
 QUERY = 'Apple'
@@ -62,6 +63,7 @@ def read_news(datasets, sort=True, remove_duplicated=True):
                             'url': article['web_url'],
                             'txt': txt,
                             'date': datetime.strptime(article['pub_date'], '%Y-%m-%dT%H:%M:%S+%f'),
+                            'lead_paragraph': article['lead_paragraph']
                         })
 
     if sort:
@@ -118,7 +120,18 @@ def tokens_span(txt):
     return tokens, spans
 
 
-def preprocess(news, encoding='UTF-8'):
+def mostly_numbers(token):
+    letters = 0
+    symbols = 0
+    for item in token:
+        if item.isalpha():
+            letters += 1
+        else:
+            symbols += 1
+    return symbols >= letters
+
+
+def preprocess(news, encoding='UTF-8', include_stopwords=False, stem_words=False, include_numbers=False):
     items = 'photo|map|drawing|chart|diagram|recipe|list|graph|logo|illustration|' \
             '(other photos)|cartoon|(photo, drawing)|(diagram of balcony)|(photo \\(Pulse column\\))'
     
@@ -144,6 +157,8 @@ def preprocess(news, encoding='UTF-8'):
         headline = headline.encode(encoding, errors='strict').decode(encoding)  # Assert no encoding errors
         headline = headline.replace('’', '\'')
         headline = headline.replace('‘', '\'')
+        headline = headline.replace('\'\'', ' ')
+        headline = headline.replace('-', ' ')
         headline = regex_spaces.sub(' ', headline)  # Remove multiple spaces
         headline = regex_tags.sub('', headline)  # Remove tags ; photos; drawings (M) ...
         headline = regex_size.sub('', headline)  # Remove size indicator (M), (L), ...
@@ -223,11 +238,19 @@ def preprocess(news, encoding='UTF-8'):
         news[i]['txt'] = news[i]['txt'].replace('Apple I', 'Apple Computer')
         news[i]['txt'] = news[i]['txt'].replace('Final Cut Pro X', 'VideoEditor')
         news[i]['txt'] = news[i]['txt'].replace('The Elder Scrolls V: Skyrim', 'Game')
+        news[i]['txt'] = news[i]['txt'].replace('AppleTV', 'Apple TV')
+        news[i]['txt'] = news[i]['txt'].replace('Apple D', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('Apple I', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('AppleInsider.com', 'Apple Insider')
+        news[i]['txt'] = news[i]['txt'].replace('AppleInsider', 'Apple Insider')
 
+        news[i]['txt'] = news[i]['txt'].replace('A.I.G', 'AIG')
+        news[i]['txt'] = news[i]['txt'].replace('A.M.D.', 'AMD')
         news[i]['txt'] = news[i]['txt'].replace('C.E.O.', 'CEO')
         news[i]['txt'] = news[i]['txt'].replace('iMac', 'Mac')
         news[i]['txt'] = news[i]['txt'].replace('Apple ComputerIE', 'Apple')
         news[i]['txt'] = news[i]['txt'].replace('Apple-1', 'Apple')
+        news[i]['txt'] = news[i]['txt'].replace('Apple.', 'Apple')
         news[i]['txt'] = news[i]['txt'].replace('Apple Computernc', 'Apple')
         news[i]['txt'] = news[i]['txt'].replace('Apple Computer', 'Apple')
         news[i]['txt'] = news[i]['txt'].replace('Apple Co', 'Apple')
@@ -255,41 +278,50 @@ def preprocess(news, encoding='UTF-8'):
 
         news[k]['txt'] = regex_spaces.sub(' ', news[k]['txt'])  # Remove multiple spaces
 
-    # Check for words that are all in mayus
-    #unknown = set()
-    #for headline in headlines[:100]:
-        #    tokens = nltk.tokenize.word_tokenize(headline)
-        #a = False
-        #for token in tokens:
-        #    if token.isalnum() and token.isupper():
-        #        unknown.add(token)
-        #        print(token, '---'.join(i.definition() for i in wordnet.synsets(token)))
-        #        a = True
-        #if a:
-        #    print(headline)
-    #    print()
-
     # How many w2v
-    if False:
-        print('Loading model...')
-        word2vec_model = GensimModel('glove-wiki-gigaword-100')  # BOWModel() # 2513 wiki
-        print('Done')
-        unknown = set()
-        for article in tqdm(news):
-            tokens = nltk.tokenize.word_tokenize(article['txt'])
-            for token in tokens:
-                try:
-                    word2vec_model.word2index(token)
-                except KeyError:
-                    try:
-                        word2vec_model.word2index(token.lower())
-                    except KeyError:
-                        unknown.add(token)
-                    # print(token)
+    print('Loading model...')
+    word2vec_model = GensimModel('glove-wiki-gigaword-50')  # BOWModel() # 2513 wiki
+    print('Done')
 
-        for word in sorted(list(unknown)):
-            print(word)
-        exit()
+    stemmer = PorterStemmer()
+    unknown = list()
+    stop_words = set(nltk.corpus.stopwords.words('english'))
+    for article in tqdm(news):
+        tokens = nltk.tokenize.word_tokenize(article['txt'])
+        article['word_indexes'] = []
+        article['word_list'] = []
+        for token in tokens:
+
+            if not token.isalnum():
+                continue
+
+            if not include_numbers and (token[0].isnumeric() or mostly_numbers(token)):
+                continue
+
+            if not include_stopwords and token.lower() in stop_words:
+                continue
+
+            if stem_words:
+                token = stemmer.stem(token.lower())
+
+            vec = None
+            try:
+                vec = word2vec_model.word2index(token)
+            except KeyError:
+                try:
+                    vec = word2vec_model.word2index(token.lower())
+                except KeyError:
+                    if token[0] == '\'' or token[0] == '.':
+                        token = token[1:]
+
+                    unknown.append((token, article['txt']))
+                # print(token)
+            if vec:
+                article['word_indexes'].append(vec)
+                article['word_list'].append(token)
+
+    #for word in sorted(list(unknown)):
+    #    print(word)
 
     # Remove non words
     return news
@@ -308,7 +340,7 @@ def main():
         logger.i('[{:d}]  {:s}'.format(i, article['txt']))
 
     before = len(news)
-    news = preprocess(news)
+    news = preprocess(news, include_stopwords=False, stem_words=False, include_numbers=False)
     after = len(news)
     print('Before', before, 'After', after, 'Removed', before - after)
 
