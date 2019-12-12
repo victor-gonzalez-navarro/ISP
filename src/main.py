@@ -4,9 +4,11 @@ import pickle
 import matplotlib.pyplot as plt
 
 from lstm_global import LSTM_Global
+from mlp import MLP_Network
 from model2 import Model2
 from utils import preprocess, preprocess_all, preprocess_all_extra, color_gen, predict_arima, \
-    create_dataset_lstm_global, create_dataset_lstm_global2, predict_arima_all, create_dataset_reg
+    create_dataset_lstm_global, create_dataset_lstm_global2, predict_arima_all, create_dataset_reg, rmse, \
+    create_dataset_mlp
 from utils import read_data
 from utils import create_gen
 from model import Model
@@ -207,6 +209,24 @@ def main_other():
     model_rf = RandomForestRegressor(n_estimators=config['rf_estimators'], random_state=100)
     model_rf.fit(seqs_train2, y_train)
 
+    seqs_train2 = create_dataset_mlp(lstm_preds_trn[:-config['next_k_items']],
+                                     arima_preds_trn[:-config['next_k_items']],
+                                     [seq[1][config['features'].index('Close')] for seq in seqs_train])
+
+    trn_predictions = []
+    for seq in seqs_train2:
+        trn_reg_preds = model_rf.predict(seq[0])
+        trn_predictions.append(trn_reg_preds)
+
+    y_mlp = np.array([seq[1] for seq in seqs_train2])
+
+    #mlp_gen = create_gen(list(zip(trn_predictions, y_mlp)), config['mlp']['batch_size'])
+
+    mlp = MLP_Network(config, name='MLP_{date:%Y-%m-%d_%H_%M_%S}'.format(date=datetime.datetime.now()))
+    mlp.buildLayers(len(trn_predictions[0]))  # TODO: Add the length of Jorge's Predictor
+    mlp.fit(trn_predictions, y_mlp)  # TODO: Feed the input of Jorge's Predictor too
+    # mlp.fit2(mlp_gen, len(trn_predictions))
+
     #gen2 = create_gen(seqs_train2, config['batch_size'])
 
     #lstm_global = LSTM_Global(config, name='LSTM_Global_{date:%Y-%m-%d_%H_%M_%S}'.format(date=datetime.datetime.now()))
@@ -224,23 +244,27 @@ def main_other():
 
     seqs_test2 = create_dataset_lstm_global(lstm_preds_tst,
                                             arima_preds_tst,
-                                            data[config['features']].values[(trn_samples + config['next_k_items']):,
-                                            config['features'].index('Close')])
+                                            [seq[1][config['features'].index('Close')] for seq in seqs_test])
 
     #lstm_global_preds = lstm_global.predict(seqs_test2, plot=sp)
     plot = True
     end = 0
     color = color_gen()
 
+    predictions = []
     for seq in seqs_test2:
         reg_preds = model_rf.predict(seq[0])
+        mlp_preds = mlp.predict(reg_preds.reshape(1, len(reg_preds)))[0, :]
+        predictions.append(mlp_preds)
 
         if plot:
             start = end
-            end = start + len(reg_preds)
-            sp.plot(list(range(start, end)), reg_preds.T, next(color) + '*-', markersize=2, linewidth=0.5)
+            end = start + len(mlp_preds)
+            sp.plot(list(range(start, end)), mlp_preds, next(color) + '*-', markersize=2, linewidth=0.5)
 
     plt.show()
+
+    print(rmse(np.array([val for preds in predictions for val in preds]), np.array([val for seq in seqs_test2 for val in seq[1]])))
 
     print('Finished')
 

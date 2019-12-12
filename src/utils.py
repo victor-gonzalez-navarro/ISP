@@ -118,6 +118,16 @@ def create_dataset_lstm_global(lstm_out, arima_out, gt):
     return list(zip(dat_x, dat_y))
 
 
+def create_dataset_mlp(lstm_out, arima_out, gt):
+    dat_x = []
+    dat_y = []
+    for i in range(len(lstm_out)):
+        dat_x.append(np.concatenate((lstm_out[i].reshape(len(lstm_out[i]), 1), arima_out[i]), axis=1))
+        dat_y.append(gt[i:i+len(lstm_out[i])])
+
+    return list(zip(dat_x, dat_y))
+
+
 def create_dataset_lstm_global2(lstm_out, arima_out):
     dat_x = []
     for i in range(len(lstm_out)):
@@ -216,3 +226,7 @@ def predict_arima_all(tst_data, config, next_k_items=50, plot=None):
         y_preds_arima.append(np.copy(y_pred_arima))
 
     return y_preds_arima
+
+
+def rmse(predictions, targets):
+    return np.sqrt(np.mean((predictions-targets)**2))
