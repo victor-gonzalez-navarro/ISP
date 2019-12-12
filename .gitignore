@@ -145,3 +145,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+price-volume-data-for-all-us-stocks-etfs/
