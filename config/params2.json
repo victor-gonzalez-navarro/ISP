@@ -22,6 +22,7 @@
   "batch_size" : 32,
   "next_k_items" : 30,
   "fourier_coefs" : [1, 3, 10],
+  "fourier_coef_2" : 3,
   "ARIMA_params" : [1,1,0],
   "rf_estimators" : 1,
   "mlp": {
