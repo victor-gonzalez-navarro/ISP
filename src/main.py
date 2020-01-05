@@ -15,6 +15,7 @@ from model import Model
 from sklearn.ensemble import RandomForestRegressor
 import datetime
 import numpy as np
+import pandas as pd
 from statsmodels.tsa.arima_model import ARIMA
 from tqdm import tqdm
 
@@ -148,19 +149,10 @@ def main_ARIMA():
 
     gen = create_gen(seqs_train, config['batch_size'])
 
-    fig = plt.figure()
-    fig.suptitle('Model 2')
-    sp = fig.add_subplot(1, 1, 1)
-    sp.plot(list(range(len(seqs_test))), [y[0] for x, y in seqs_test], linewidth=2)
-
-    m = Model2(config, name='Model2_{date:%Y-%m-%d_%H_%M_%S}'.format(date=datetime.datetime.now()))
-    output_feats = seqs_train[0][0].shape[1]
-    m.buildLayers(output_feats)
-    print('Fitting LSTM model...')
-    m.fit(gen, len(seqs_train))
-    print('Obtaining Train Predictions by LSTM model...')
-    # lstm_preds_trn = m.predict(seqs_train, next_k_items=1)  # config['next_k_items'])
-    lstm_preds_trn = m.predict_all(seqs_train, next_k_items=config['next_k_items'])
+    # fig = plt.figure()
+    # fig.suptitle('Model 2')
+    # sp = fig.add_subplot(1, 1, 1)
+    # sp.plot(list(range(len(seqs_test))), [y[0] for x, y in seqs_test], linewidth=2)
 
     print('Fitting ARIMA model...')
     # arima_preds_trn = predict_arima(seqs_train, config, next_k_items=1)  # config['next_k_items'])
@@ -169,6 +161,15 @@ def main_ARIMA():
     f = open('./arima_preds.pckl', 'wb')
     pickle.dump(arima_preds_trn, f)
     f.close()
+
+    m = Model2(config, name='LSTM_{date:%Y-%m-%d_%H_%M_%S}'.format(date=datetime.datetime.now()))
+    output_feats = seqs_train[0][0].shape[1]
+    m.buildLayers(output_feats)
+    print('Fitting LSTM model...')
+    m.fit(gen, len(seqs_train))
+    print('Obtaining Train Predictions by LSTM model...')
+    # lstm_preds_trn = m.predict(seqs_train, next_k_items=1)  # config['next_k_items'])
+    lstm_preds_trn = m.predict_all(seqs_train, next_k_items=config['next_k_items'])
 
     f2 = open('./lstm_preds.pckl', 'wb')
     pickle.dump(lstm_preds_trn, f2)
@@ -185,7 +186,7 @@ def main_other():
 
     seqs_train, seqs_test = preprocess_all_extra(data, config)
 
-    m = Model2(config, model_path='../models/Model2_2019-11-09_19_00_15')
+    m = Model2(config, model_path='../models/LSTM_2019-12-31_17_32_51')
 
     f = open('./arima_preds.pckl', 'rb')
     arima_preds_trn = pickle.load(f)
@@ -196,11 +197,11 @@ def main_other():
     f2.close()
 
     fig = plt.figure()
-    fig.suptitle('Model 2')
+    fig.suptitle('Real Stock Market And Predictions')
     sp = fig.add_subplot(1, 1, 1)
     sp.plot(list(range(len(seqs_test))), [y[0] for x, y in seqs_test], linewidth=2)
 
-    trn_samples = round(config['train_test_split'] * data.shape[0])
+    # trn_samples = round(config['train_test_split'] * data.shape[0])
     seqs_train2, y_train = create_dataset_reg(lstm_preds_trn[:-config['next_k_items']],
                                               arima_preds_trn[:-config['next_k_items']],
                                               [seq[1][config['features'].index('Close')] for seq in seqs_train])
@@ -220,11 +221,31 @@ def main_other():
 
     y_mlp = np.array([seq[1] for seq in seqs_train2])
 
-    #mlp_gen = create_gen(list(zip(trn_predictions, y_mlp)), config['mlp']['batch_size'])
+    trn_dates = data.Date.iloc[config['next_k_items'] - 1:round(data.shape[0] * config['train_test_split']) - 31].values
+    tst_dates_ixs = np.arange(round(data.shape[0] * config['train_test_split']) + config['next_k_items'] - 1, data.shape[0], 30)
+    tst_dates = data.Date.iloc[tst_dates_ixs].values
+
+    with open('../data/news_predicted.json') as f:
+        news_pred_json = json.load(f)
+    news_pred = [[row['date']] + row['predicted_labels'] for row in news_pred_json]
+    news_pred = pd.DataFrame(news_pred, columns=['Date', 'T_2', 'T_10', 'T_20', 'T_30'])
+    news_pred.Date = pd.to_datetime(news_pred.Date)
+    news_pred.Date = news_pred.Date.apply(lambda s: date_string(s))
+
+    valid_trn_dates = np.isin(trn_dates, news_pred.Date.values)
+    valid_tst_dates = np.isin(tst_dates, news_pred.Date.values)
+
+    valid_y_mlp = y_mlp[valid_trn_dates, :]
+    valid_trn_preds = []
+    for i in range(len(trn_predictions)):
+        if valid_trn_dates[i]:
+            valid_trn_preds.append(np.concatenate((trn_predictions[i], news_pred[news_pred.Date == trn_dates[i]].values[0, 1:])))
+
+    # mlp_gen = create_gen(list(zip(trn_predictions, y_mlp)), config['mlp']['batch_size'])
 
     mlp = MLP_Network(config, name='MLP_{date:%Y-%m-%d_%H_%M_%S}'.format(date=datetime.datetime.now()))
-    mlp.buildLayers(len(trn_predictions[0]))  # TODO: Add the length of Jorge's Predictor
-    mlp.fit(trn_predictions, y_mlp)  # TODO: Feed the input of Jorge's Predictor too
+    mlp.buildLayers(len(valid_trn_preds[0]))
+    mlp.fit(valid_trn_preds, valid_y_mlp)
     # mlp.fit2(mlp_gen, len(trn_predictions))
 
     #gen2 = create_gen(seqs_train2, config['batch_size'])
@@ -252,15 +273,26 @@ def main_other():
     color = color_gen()
 
     predictions = []
-    for seq in seqs_test2:
-        reg_preds = model_rf.predict(seq[0])
-        mlp_preds = mlp.predict(reg_preds.reshape(1, len(reg_preds)))[0, :]
-        predictions.append(mlp_preds)
+    for seq_ix in range(len(seqs_test2)):
+        reg_preds = model_rf.predict(seqs_test2[seq_ix][0])
+
+        if valid_tst_dates[seq_ix]:
+            mlp_preds = mlp.predict(np.concatenate((reg_preds,news_pred[news_pred.Date == tst_dates[seq_ix]].
+                                                    values[0, 1:])).reshape(1, -1))[0, :]
+            predictions.append(mlp_preds)
+        else:
+            predictions.append(reg_preds)
+
+        fft = np.fft.fft(predictions[-1])
+        aux_fft = np.copy(fft)
+        aux_fft[config['fourier_coef_2']:-config['fourier_coef_2']] = 0
+        ifft = np.fft.ifft(aux_fft).real.reshape((len(aux_fft), 1))
+        predictions[-1] = ifft
 
         if plot:
             start = end
-            end = start + len(mlp_preds)
-            sp.plot(list(range(start, end)), mlp_preds, next(color) + '*-', markersize=2, linewidth=0.5)
+            end = start + len(predictions[-1])
+            sp.plot(list(range(start, end)), predictions[-1], next(color) + '*-', markersize=2, linewidth=0.5)
 
     plt.show()
 
@@ -269,7 +301,14 @@ def main_other():
     print('Finished')
 
 
+def date_string(s):
+    t = datetime.datetime.strftime(s, '%d-%m-%Y')
+    return t[:-4] + t[-2:]
+
+
+# main_ARIMA()
 main_other()
+
 # x = np.sin(np.linspace(0, 3 * 2 * np.pi, 3 * 360)) + np.random.normal(0, 0.011, 3 * 360)
 #
 # plt.plot(x)
