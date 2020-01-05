@@ -24,7 +24,7 @@ from pandas.plotting import register_matplotlib_converters
 
 FILE_PATH = Path(__file__).resolve().parents[0]
 IN_PATH = (FILE_PATH / '../../data/preprocessed_wsj6_.json').resolve()
-STOCK_PATH = (FILE_PATH / '../../data/sp500.csv').resolve()
+STOCK_PATH = (FILE_PATH / '../../data/AAPL.csv').resolve()
 MODEL_PATH = (FILE_PATH / '../../models/news_model1.h5').resolve()
 
 BEGIN_TIME = datetime(year=2007, month=1, day=1)

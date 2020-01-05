@@ -21,7 +21,7 @@ WINDOWS_SIZES = (2, 10, 20, 30)
 WINDOW_PLOT_SIZE = WINDOWS_SIZES[1]
 
 
-def read_news(path: Path):
+def read_news(path: Path, sort=True):
     with path.open('r') as f:
         data = json.load(f)
     for article in data:
@@ -29,7 +29,11 @@ def read_news(path: Path):
             article['date'] = datetime.strptime(article['date'], '%m/%d/%y')
         else:
             article['date'] = datetime.strptime(article['date'], '%Y-%m-%d %H:%M:%S')
-    return data
+
+    if sort:
+        return sorted(data, key=lambda k: k['date'])
+    else:
+        return data
 
 
 def read_stocks(path: Path, start=None, end=None, normalize=True):

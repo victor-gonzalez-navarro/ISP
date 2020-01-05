@@ -30,7 +30,7 @@ FILE_PATH = Path(__file__).resolve().parents[0]
 IN_PATH = (FILE_PATH / '../../data/preprocessed_content.json').resolve()
 NEGATIVE_PATH = (FILE_PATH / '../../data/negative_words.txt').resolve()
 POSITIVE_PATH = (FILE_PATH / '../../data/positive_words.txt').resolve()
-STOCK_PATH = (FILE_PATH / '../../data/sp500.csv').resolve()
+STOCK_PATH = (FILE_PATH / '../../data/AAPL.csv').resolve()
 MODEL_PATH = (FILE_PATH / '../../models/news_model1.h5').resolve()
 
 BEGIN_TIME = datetime(year=2007, month=1, day=1)
@@ -302,7 +302,6 @@ def main():
         print()
         print()
         i += 15
-
     exit()
     # -----------------------------------------------------------------
     negative = set(load_words(NEGATIVE_PATH))
