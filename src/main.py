@@ -149,19 +149,10 @@ def main_ARIMA():
 
     gen = create_gen(seqs_train, config['batch_size'])
 
-    fig = plt.figure()
-    fig.suptitle('Model 2')
-    sp = fig.add_subplot(1, 1, 1)
-    sp.plot(list(range(len(seqs_test))), [y[0] for x, y in seqs_test], linewidth=2)
-
-    m = Model2(config, name='Model2_{date:%Y-%m-%d_%H_%M_%S}'.format(date=datetime.datetime.now()))
-    output_feats = seqs_train[0][0].shape[1]
-    m.buildLayers(output_feats)
-    print('Fitting LSTM model...')
-    m.fit(gen, len(seqs_train))
-    print('Obtaining Train Predictions by LSTM model...')
-    # lstm_preds_trn = m.predict(seqs_train, next_k_items=1)  # config['next_k_items'])
-    lstm_preds_trn = m.predict_all(seqs_train, next_k_items=config['next_k_items'])
+    # fig = plt.figure()
+    # fig.suptitle('Model 2')
+    # sp = fig.add_subplot(1, 1, 1)
+    # sp.plot(list(range(len(seqs_test))), [y[0] for x, y in seqs_test], linewidth=2)
 
     print('Fitting ARIMA model...')
     # arima_preds_trn = predict_arima(seqs_train, config, next_k_items=1)  # config['next_k_items'])
@@ -170,6 +161,15 @@ def main_ARIMA():
     f = open('./arima_preds.pckl', 'wb')
     pickle.dump(arima_preds_trn, f)
     f.close()
+
+    m = Model2(config, name='LSTM_{date:%Y-%m-%d_%H_%M_%S}'.format(date=datetime.datetime.now()))
+    output_feats = seqs_train[0][0].shape[1]
+    m.buildLayers(output_feats)
+    print('Fitting LSTM model...')
+    m.fit(gen, len(seqs_train))
+    print('Obtaining Train Predictions by LSTM model...')
+    # lstm_preds_trn = m.predict(seqs_train, next_k_items=1)  # config['next_k_items'])
+    lstm_preds_trn = m.predict_all(seqs_train, next_k_items=config['next_k_items'])
 
     f2 = open('./lstm_preds.pckl', 'wb')
     pickle.dump(lstm_preds_trn, f2)
@@ -186,7 +186,7 @@ def main_other():
 
     seqs_train, seqs_test = preprocess_all_extra(data, config)
 
-    m = Model2(config, model_path='../models/Model2_2019-11-09_19_00_15')
+    m = Model2(config, model_path='../models/LSTM_2019-12-31_17_32_51')
 
     f = open('./arima_preds.pckl', 'rb')
     arima_preds_trn = pickle.load(f)
@@ -197,7 +197,7 @@ def main_other():
     f2.close()
 
     fig = plt.figure()
-    fig.suptitle('Model 2')
+    fig.suptitle('Real Stock Market And Predictions')
     sp = fig.add_subplot(1, 1, 1)
     sp.plot(list(range(len(seqs_test))), [y[0] for x, y in seqs_test], linewidth=2)
 
@@ -306,7 +306,9 @@ def date_string(s):
     return t[:-4] + t[-2:]
 
 
+# main_ARIMA()
 main_other()
+
 # x = np.sin(np.linspace(0, 3 * 2 * np.pi, 3 * 360)) + np.random.normal(0, 0.011, 3 * 360)
 #
 # plt.plot(x)
