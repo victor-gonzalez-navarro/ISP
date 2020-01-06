@@ -143,7 +143,7 @@ def main_ARIMA():
     with open('../config/params2.json', 'r') as read_file:
         config = json.load(read_file)
 
-    data = read_data('../data/sp500.csv')
+    data = read_data('../data/AAPL.csv')
 
     seqs_train, seqs_test = preprocess_all_extra(data, config)
 
@@ -182,7 +182,7 @@ def main_other():
     with open('../config/params2.json', 'r') as read_file:
         config = json.load(read_file)
 
-    data = read_data('../data/sp500.csv')
+    data = read_data('../data/AAPL.csv')
 
     seqs_train, seqs_test = preprocess_all_extra(data, config)
 
@@ -306,8 +306,9 @@ def date_string(s):
     return t[:-4] + t[-2:]
 
 
-# main_ARIMA()
-main_other()
+if __name__ == '__main__':
+    # main_ARIMA()
+    main_other()
 
 # x = np.sin(np.linspace(0, 3 * 2 * np.pi, 3 * 360)) + np.random.normal(0, 0.011, 3 * 360)
 #
