@@ -1,17 +1,62 @@
 {
   "train_test_split" : 0.85,
-  "features" : ["Close", "Volume"],
-  "feature_prediction" : "Close",
-  "length_sequence" : 50,
+  "features" : ["Close", "Volume", "High", "Low", "Open"],
+  "length_sequence" : 30,
   "layers" : {
-              "neurons" : [100, 100, 100, 1],
+              "neurons" : [100, 100, 100],
               "activationDense" : "linear",
-              "timesteps" : 49,
+              "timesteps" : 29,
               "droprate" : [0.2, 0.2],
               "loss" : "mse",
               "optimizer" : "adam"
               },
-  "num_epochs" : 2,
+   "layers_lstm_global" : {
+              "neurons" : [100, 100, 100],
+              "activationDense" : "linear",
+              "timesteps" : 30,
+              "droprate" : [0.2, 0.2],
+              "loss" : "mse",
+              "optimizer" : "adam"
+              },
+  "num_epochs" : 10,
   "batch_size" : 32,
-  "next_k_items" : 50
+  "next_k_items" : 30,
+  "fourier_coefs" : [1, 3, 10],
+  "fourier_coef_2" : 3,
+  "ARIMA_params" : [1,1,0],
+  "rf_estimators" : 150,
+  "mlp": {
+          "layers" : [
+                      {
+                        "type" : "Dense",
+                        "neurons" : 80,
+                        "return_seq": true,
+                        "activation": "relu"
+                      },
+                      {
+                        "type" : "Dropout",
+                        "droprate" : 0.2,
+                        "return_seq": true
+                      },
+                      {
+                        "type" : "Dense",
+                        "neurons" : 120,
+                        "return_seq": true,
+                        "activation": "relu"
+                      },
+                      {
+                        "type" : "Dropout",
+                        "droprate" : 0.2
+                      },
+                      {
+                        "type" : "Dense",
+                        "neurons" : 30,
+                        "activation": "linear"
+                      }
+                    ],
+                    "num_epochs" : 10,
+                    "batch_size" : 128,
+                    "loss" : "mse",
+                    "optimizer" : "adam"
+                  }
 }

@@ -3,6 +3,7 @@ from keras.models import Sequential, load_model
 from keras.layers import Dense, Dropout, LSTM
 from keras.callbacks import ModelCheckpoint
 from utils import color_gen
+from tqdm import tqdm
 
 
 class Model2:
@@ -75,7 +76,7 @@ class Model2:
         y_preds = []
         y_pred = np.zeros((next_k_items, tst_data[0][0].shape[1]))
 
-        for seq_id in range(len(tst_data)):
+        for seq_id in tqdm(range(len(tst_data))):
             for counter in range(next_k_items):
                 if counter % next_k_items == 0:
                     counter = 0

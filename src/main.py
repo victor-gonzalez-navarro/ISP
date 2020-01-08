@@ -1,30 +1,30 @@
-import json
-import warnings
-import pickle
-import matplotlib.pyplot as plt
-
-from lstm_global import LSTM_Global
-from mlp import MLP_Network
-from model2 import Model2
-from utils import preprocess, preprocess_all, preprocess_all_extra, color_gen, predict_arima, \
-    create_dataset_lstm_global, create_dataset_lstm_global2, predict_arima_all, create_dataset_reg, rmse, \
-    create_dataset_mlp
-from utils import read_data
-from utils import create_gen
-from model import Model
-from sklearn.ensemble import RandomForestRegressor
 import datetime
+import json
+import pickle
+import warnings
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from statsmodels.tsa.arima_model import ARIMA
-from tqdm import tqdm
+from sklearn.ensemble import RandomForestRegressor
 
+from mlp import MLP_Network
+from model import Model
+from model2 import Model2
+from utils import create_gen
+from utils import preprocess, preprocess_all, preprocess_all_extra, color_gen, predict_arima, \
+    create_dataset_lstm_global, predict_arima_all, create_dataset_reg, rmse, \
+    create_dataset_mlp
+from utils import read_data
+
+USE_NEWS = True
+EXECUTE_ARIMA = True
 
 def main_new_model():
-    with open('../config/params.json', 'r') as read_file:
+    with open('../config/params_DEPRECATED.json', 'r') as read_file:
         config = json.load(read_file)
 
-    data = read_data('../data/sp500.csv')
+    data = read_data('../data/stock_values/AAPL.csv')
     seqs_train, seqs_test = preprocess(data, config)
 
     gen = create_gen(seqs_train, config['batch_size'])
@@ -44,10 +44,10 @@ def main_new_model():
 
 
 def main_new_model_all():
-    with open('../config/params2.json', 'r') as read_file:
+    with open('../config/params.json', 'r') as read_file:
         config = json.load(read_file)
 
-    data = read_data('../data/sp500.csv')
+    data = read_data('../data/stock_values/AAPL.csv')
     seqs_train, seqs_test = preprocess_all(data, config)
 
     gen = create_gen(seqs_train, config['batch_size'])
@@ -67,10 +67,10 @@ def main_new_model_all():
 
 
 def main_best_model():
-    with open('../config/params.json', 'r') as read_file:
+    with open('../config/params_DEPRECATED.json', 'r') as read_file:
         config = json.load(read_file)
 
-    data = read_data('../data/sp500.csv')
+    data = read_data('../data/stock_values/AAPL.csv')
     seqs_train, seqs_test = preprocess(data, config)
 
     fig = plt.figure()
@@ -87,10 +87,10 @@ def main_best_model():
 
 
 def main_best_model_all():
-    with open('../config/params2.json', 'r') as read_file:
+    with open('../config/params.json', 'r') as read_file:
         config = json.load(read_file)
 
-    data = read_data('../data/sp500.csv')
+    data = read_data('../data/stock_values/AAPL.csv')
     seqs_train, seqs_test = preprocess_all(data, config)
 
     fig = plt.figure()
@@ -107,10 +107,10 @@ def main_best_model_all():
 
 
 def main_fourier():
-    with open('../config/params2.json', 'r') as read_file:
+    with open('../config/params.json', 'r') as read_file:
         config = json.load(read_file)
 
-    data = read_data('../data/sp500.csv')
+    data = read_data('../data/stock_values/AAPL.csv')
 
     seqs_train, seqs_test = preprocess_all_extra(data, config)
 
@@ -140,10 +140,10 @@ def main_best_fourier():
 def main_ARIMA():
     warnings.filterwarnings("ignore")
 
-    with open('../config/params2.json', 'r') as read_file:
+    with open('../config/params.json', 'r') as read_file:
         config = json.load(read_file)
 
-    data = read_data('../data/AAPL.csv')
+    data = read_data('../data/stock_values/AAPL.csv')
 
     seqs_train, seqs_test = preprocess_all_extra(data, config)
 
@@ -179,10 +179,10 @@ def main_ARIMA():
 def main_other():
     warnings.filterwarnings("ignore")
 
-    with open('../config/params2.json', 'r') as read_file:
+    with open('../config/params.json', 'r') as read_file:
         config = json.load(read_file)
 
-    data = read_data('../data/AAPL.csv')
+    data = read_data('../data/stock_values/AAPL.csv')
 
     seqs_train, seqs_test = preprocess_all_extra(data, config)
 
@@ -199,7 +199,7 @@ def main_other():
     fig = plt.figure()
     fig.suptitle('Real Stock Market And Predictions')
     sp = fig.add_subplot(1, 1, 1)
-    sp.plot(list(range(len(seqs_test))), [y[0] for x, y in seqs_test], linewidth=2)
+    sp.plot(list(range(len(seqs_test))), [y[0] for x, y in seqs_test], linewidth=4)
 
     # trn_samples = round(config['train_test_split'] * data.shape[0])
     seqs_train2, y_train = create_dataset_reg(lstm_preds_trn[:-config['next_k_items']],
@@ -276,12 +276,12 @@ def main_other():
     for seq_ix in range(len(seqs_test2)):
         reg_preds = model_rf.predict(seqs_test2[seq_ix][0])
 
-        if valid_tst_dates[seq_ix]:
+        if USE_NEWS or not valid_tst_dates[seq_ix]:
+            predictions.append(reg_preds)
+        else:
             mlp_preds = mlp.predict(np.concatenate((reg_preds,news_pred[news_pred.Date == tst_dates[seq_ix]].
                                                     values[0, 1:])).reshape(1, -1))[0, :]
             predictions.append(mlp_preds)
-        else:
-            predictions.append(reg_preds)
 
         fft = np.fft.fft(predictions[-1])
         aux_fft = np.copy(fft)
@@ -292,7 +292,7 @@ def main_other():
         if plot:
             start = end
             end = start + len(predictions[-1])
-            sp.plot(list(range(start, end)), predictions[-1], next(color) + '*-', markersize=2, linewidth=0.5)
+            sp.plot(list(range(start, end)), predictions[-1], next(color) + '*-', markersize=2, linewidth=3)
 
     plt.show()
 
@@ -307,16 +307,6 @@ def date_string(s):
 
 
 if __name__ == '__main__':
-    # main_ARIMA()
+    if EXECUTE_ARIMA:
+        main_ARIMA()
     main_other()
-
-# x = np.sin(np.linspace(0, 3 * 2 * np.pi, 3 * 360)) + np.random.normal(0, 0.011, 3 * 360)
-#
-# plt.plot(x)
-#
-# arima = ARIMA(x, order=(50,1,0))
-#
-# arima_fit = arima.fit(disp=0)
-#
-# plt.plot(list(range(3 * 360 + 1, 3 * 360 + 200 + 1)), arima_fit.forecast(200)[0], 'r')
-# plt.show()
